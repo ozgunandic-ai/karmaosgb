@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>İSG Risk Analizi – 5x5 Matris</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<style>
+:root{
+  --bg:#EDF0EF;--panel:#fff;--ink:#14262B;--muted:#5A6B70;--line:#D2DAD9;
+  --brand:#0F4C5C;--brand-2:#0B3742;--signal:#F5B700;
+  --l1:#2F8F58;--l2:#A9C94B;--l3:#F3C433;--l4:#EE8B2C;--l5:#C93A2A;
+  --r:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+h1,h2,h3,.num{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-weight:600;margin:0}
+h1{font-size:26px;letter-spacing:.2px}
+h2{font-size:18px;margin-bottom:12px}
+p{margin:0}
+.muted{color:var(--muted)}
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100%}
+aside{background:var(--brand-2);color:#fff;padding:22px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:22px}
+.brand{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:20px;line-height:1.15;padding-left:12px;border-left:5px solid var(--signal)}
+.brand small{display:block;font:400 12px "IBM Plex Sans",sans-serif;color:#A9C3CA;margin-top:4px}
+nav{display:flex;flex-direction:column;gap:4px}
+nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:var(--r);color:#CFE0E4;display:block}
+nav button:hover{background:rgba(255,255,255,.08)}
+nav button[aria-current="true"]{background:#fff;color:var(--brand-2);font-weight:600}
+nav button:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.side-foot{margin-top:auto;font-size:12px;color:#A9C3CA}
+main{padding:28px 32px 60px;min-width:0}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.head p{color:var(--muted);margin-top:2px;max-width:60ch}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+.grid .full{grid-column:1/-1}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+label{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-bottom:4px}
+input,select,textarea{font:inherit;color:inherit;width:100%;border:1px solid var(--line);border-radius:4px;padding:8px 10px;background:#fff}
+textarea{resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible,summary:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.btn{font:inherit;font-weight:500;border:1px solid var(--brand);background:var(--brand);color:#fff;padding:8px 14px;border-radius:var(--r);cursor:pointer}
+.btn:hover{background:var(--brand-2)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:#fff;color:var(--brand)}
+.btn.ghost:hover{background:#E6EEEF}
+.btn.danger{background:#fff;color:#A3281B;border-color:#E2B4AE}
+.btn.danger:hover{background:#FBEDEB}
+.btn.sm{padding:4px 10px;font-size:13px}
+.ekip-row{display:grid;grid-template-columns:1fr 1.4fr auto;gap:10px;margin-bottom:10px;align-items:end}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+.valid{margin-top:14px;padding:10px 12px;border-left:4px solid var(--signal);background:#FFF8DF;border-radius:0 var(--r) var(--r) 0}
+.valid.bad{border-color:var(--l5);background:#FCEBE8}
+
+/* risk seviyeleri */
+.lv1{background:var(--l1);color:#fff}.lv2{background:var(--l2);color:var(--ink)}.lv3{background:var(--l3);color:var(--ink)}.lv4{background:var(--l4);color:var(--ink)}.lv5{background:var(--l5);color:#fff}
+.badge{display:inline-block;min-width:34px;text-align:center;font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:17px;padding:2px 8px;border-radius:4px}
+td small{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.dash{color:var(--muted)}
+
+/* matris */
+.mx-wrap{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:start}
+@media(max-width:900px){.mx-wrap{grid-template-columns:1fr}}
+.mx{display:grid;grid-template-columns:26px repeat(5,64px);grid-auto-rows:64px;gap:3px}
+.mx-h{display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;color:var(--muted)}
+.mx-c{position:relative;border-radius:4px}
+.mx-s{position:absolute;left:5px;top:3px;font-size:11px;opacity:.75}
+.mx-n{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:26px}
+.mx-ax{grid-column:2/-1;text-align:center;font-size:12px;color:var(--muted);height:auto}
+.mx-ay{font-size:12px;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;font-size:13px;background:#fff}
+.seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
+.seg button:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+table.dist{border-collapse:collapse;width:100%;max-width:440px}
+.dist th,.dist td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-size:14px}
+.dist td:nth-child(n+3),.dist th:nth-child(n+3){text-align:right}
+.chip{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* risk tablosu */
+.tw{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:#fff;max-height:72vh}
+table.rt{border-collapse:separate;border-spacing:0;min-width:1720px;width:100%}
+.rt th{position:sticky;background:var(--brand);color:#fff;font-weight:500;padding:8px;text-align:left;font-size:13px;z-index:2;white-space:nowrap}
+.rt thead tr:first-child th{top:0;height:34px;background:var(--brand-2);text-align:center;border-left:1px solid rgba(255,255,255,.2)}
+.rt thead tr:nth-child(2) th{top:34px}
+.rt td{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}
+.rt tbody tr:hover td{background:#F7FAF9}
+.rt td textarea{width:100%;min-height:78px;font-size:14px}
+.rt td select,.rt td input{padding:6px 6px;font-size:14px}
+.rt .c-t{min-width:190px}.rt .c-ted{min-width:320px}.rt .c-n{width:64px}.rt .c-sc{width:92px;text-align:center}.rt .c-d{min-width:140px}.rt .c-x{width:46px}
+.rt .idx{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;text-align:center;color:var(--muted)}
+.empty{padding:34px 20px;text-align:center;color:var(--muted)}
+.empty .actions{justify-content:center;margin-top:12px}
+
+/* sohbet */
+.chat{display:flex;flex-direction:column;height:min(62vh,640px);border:1px solid var(--line);border-radius:var(--r);background:#fff}
+#msgs{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:min(760px,92%);padding:10px 14px;border-radius:10px;white-space:pre-wrap;word-wrap:break-word}
+.msg.u{align-self:flex-end;background:var(--brand);color:#fff}
+.msg.a{align-self:flex-start;background:#F0F4F3;border:1px solid var(--line)}
+.msg.err{background:#FCEBE8;border-color:#E2B4AE;color:#8A2015}
+.prop{margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:8px;white-space:normal}
+.pi{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px;border-bottom:1px solid var(--line);cursor:pointer;margin:0;color:var(--ink);font-weight:400;font-size:14px}
+.pi input{width:auto}
+.pi:last-of-type{border-bottom:0}
+.prop .actions{margin-top:8px}
+.composer{display:flex;gap:10px;padding:12px;border-top:1px solid var(--line)}
+.composer textarea{min-height:44px;max-height:140px}
+details{margin-bottom:14px}
+summary{cursor:pointer;font-weight:600;padding:6px 0}
+.typing{color:var(--muted);font-style:italic}
+
+#toast{position:fixed;right:20px;bottom:20px;background:var(--brand-2);color:#fff;padding:10px 16px;border-radius:var(--r);box-shadow:0 4px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s;max-width:340px}
+#toast.on{opacity:1}
+@media(max-width:860px){
+  .app{grid-template-columns:1fr}
+  aside{position:static;height:auto;flex-direction:column;padding:14px}
+  nav{flex-direction:row;overflow:auto}
+  nav button{white-space:nowrap}
+  .side-foot{margin-top:0}
+  main{padding:20px 14px 60px}
+}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">İSG Risk Analizi<small>5x5 matris değerlendirme</small></div>
+    <nav aria-label="Bölümler">
+      <button data-tab="firma" aria-current="true">Firma ve ekip</button>
+      <button data-tab="risk">Risk tablosu</button>
+      <button data-tab="asistan">Yapay zeka asistanı</button>
+      <button data-tab="kayit">Kayıt ve çıktı</button>
+    </nav>
+    <div class="side-foot" id="saved" role="status">Henüz kaydedilmedi</div>
+  </aside>
+
+  <main>
+    <!-- 1. FİRMA VE EKİP -->
+    <section class="tab" id="tab-firma">
+      <div class="head"><div><h1>Firma ve ekip</h1><p>Bu bilgiler rapor kapağında ve Excel çıktısında yer alır.</p></div></div>
+
+      <div class="panel">
+        <h2>Firma bilgileri</h2>
+        <div class="grid">
+          <div class="full"><label for="f-unvan">Firma unvanı</label><input id="f-unvan" data-bind="firma.unvan"></div>
+          <div class="full"><label for="f-adres">Adres</label><textarea id="f-adres" rows="2" data-bind="firma.adres"></textarea></div>
+          <div class="full"><label for="f-faaliyet">Faaliyet konusu</label><textarea id="f-faaliyet" rows="2" data-bind="firma.faaliyet"></textarea></div>
+          <div><label for="f-isveren">İşveren (ad soyad)</label><input id="f-isveren" data-bind="firma.isveren"></div>
+          <div><label for="f-uzman">İş güvenliği uzmanı (ad soyad)</label><input id="f-uzman" data-bind="firma.uzman"></div>
+          <div><label for="f-hekim">İşyeri hekimi (ad soyad)</label><input id="f-hekim" data-bind="firma.hekim"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Diğer ekip üyeleri</h2>
+        <div id="ekip"></div>
+        <button class="btn ghost sm" data-act="addEkip">Ekip üyesi ekle</button>
+        <p class="note">Çalışan temsilcisi, destek elemanı, bölüm sorumlusu gibi kişileri unvanlarıyla ekleyin.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Risk analizi</h2>
+        <div class="grid">
+          <div><label for="a-sinif">Tehlike sınıfı</label>
+            <select id="a-sinif" data-bind="analiz.sinif">
+              <option value="">Seçin</option>
+              <option value="cok">Çok tehlikeli</option>
+              <option value="tehlikeli">Tehlikeli</option>
+              <option value="az">Az tehlikeli</option>
+            </select></div>
+          <div><label for="a-tarih">Risk analizi tarihi</label><input type="date" id="a-tarih" data-bind="analiz.tarih"></div>
+          <div><label for="a-rev">Revizyon no</label><input id="a-rev" data-bind="analiz.revNo" placeholder="Revizyon yoksa boş bırakın"></div>
+          <div><label for="a-revt">Revizyon tarihi</label><input type="date" id="a-revt" data-bind="analiz.revTarih"></div>
+        </div>
+        <div class="valid" id="validity" role="status"></div>
+      </div>
+    </section>
+
+    <!-- 2. RİSK TABLOSU -->
+    <section class="tab" id="tab-risk" hidden>
+      <div class="head">
+        <div><h1>Risk tablosu</h1><p>Risk skoru = olasılık × şiddet. Tüm alanlar düzenlenebilir; madde ekleyip silebilirsiniz.</p></div>
+        <div class="actions">
+          <button class="btn ghost" data-act="addRisk">Madde ekle</button>
+          <button class="btn" data-act="xlsx">Excel'e aktar</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="seg" role="group" aria-label="Matris görünümü">
+          <button data-act="mx" data-mode="now" aria-pressed="true">Mevcut durum</button>
+          <button data-act="mx" data-mode="after" aria-pressed="false">Faaliyet sonrası</button>
+        </div>
+        <div class="mx-wrap">
+          <div id="matrix"></div>
+          <div id="dist"></div>
+        </div>
+      </div>
+
+      <div id="riskWrap"></div>
+    </section>
+
+    <!-- 3. ASİSTAN -->
+    <section class="tab" id="tab-asistan" hidden>
+      <div class="head">
+        <div><h1>Yapay zeka asistanı</h1><p>Asistan bölümünüz hakkında sorular sorar, ardından tehlike, risk, olasılık, şiddet ve tedbirleri önerir. Önerileri seçip tabloya ekleyin, sonra elle düzeltin.</p></div>
+        <div class="actions"><button class="btn ghost sm" data-act="clearChat">Sohbeti temizle</button></div>
+      </div>
+
+      <details id="aiSet">
+        <summary>Gemini bağlantı ayarları</summary>
+        <div class="panel">
+          <div class="grid">
+            <div><label for="s-key">Gemini API anahtarı</label><input type="password" id="s-key" data-set="geminiKey" autocomplete="off" placeholder="AIza..."></div>
+            <div><label for="s-model">Model</label><input id="s-model" data-set="model" list="models"><datalist id="models"><option value="gemini-3.5-flash"><option value="gemini-3.6-flash"><option value="gemini-3.5-flash-lite"><option value="gemini-3.1-flash-lite"></datalist></div>
+            <div class="full"><label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" data-set="remember" style="width:auto"> Anahtarları bu tarayıcıda hatırla (işaretlenmezse sekme kapanınca silinir)</label></div>
+          </div>
+          <p class="note">Anahtar yalnızca tarayıcınızdan doğrudan Google'a gönderilir. Firma verileri sohbet sırasında Gemini'ye iletilir. Anahtarı Google AI Studio'dan alabilirsiniz.</p>
+        </div>
+      </details>
+
+      <div class="chat">
+        <div id="msgs" aria-live="polite"></div>
+        <div class="composer">
+          <textarea id="chatIn" rows="1" placeholder="Örn: Kaynak atölyesindeki riskleri çıkaralım" aria-label="Mesajınız"></textarea>
+          <button class="btn" data-act="send" id="sendBtn">Gönder</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. KAYIT -->
+    <section class="tab" id="tab-kayit" hidden>
+      <div class="head"><div><h1>Kayıt ve çıktı</h1><p>Analiz tarayıcıda otomatik saklanır. GitHub'a kaydederek her yerden kaldığınız yerden devam edebilirsiniz.</p></div></div>
+
+      <div class="panel">
+        <h2>GitHub'a kaydet</h2>
+        <div class="grid">
+          <div class="full"><label for="g-token">GitHub erişim anahtarı (fine-grained token)</label><input type="password" id="g-token" data-set="ghToken" autocomplete="off" placeholder="github_pat_..."></div>
+          <div><label for="g-owner">Kullanıcı veya organizasyon</label><input id="g-owner" data-set="ghOwner"></div>
+          <div><label for="g-repo">Depo adı</label><input id="g-repo" data-set="ghRepo"></div>
+          <div><label for="g-branch">Dal</label><input id="g-branch" data-set="ghBranch" placeholder="main"></div>
+          <div><label for="g-path">Dosya yolu</label><input id="g-path" data-set="ghPath" placeholder="Boşsa firma adından üretilir"></div>
+        </div>
+        <div class="actions" style="margin-top:14px">
+          <button class="btn" data-act="ghSave">GitHub'a kaydet</button>
+          <button class="btn ghost" data-act="ghLoad">GitHub'dan yükle</button>
+        </div>
+        <p class="note" id="ghMsg" role="status">Firma verisi içerdiği için özel (private) bir depo kullanın. Anahtara yalnızca bu depo için "Contents: Read and write" izni verin.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Dosya olarak</h2>
+        <div class="actions">
+          <button class="btn" data-act="xlsx">Excel'e aktar</button>
+          <button class="btn ghost" data-act="jsonDown">JSON indir</button>
+          <button class="btn ghost" data-act="jsonUp">JSON yükle</button>
+          <input type="file" id="jsonFile" accept=".json,application/json" hidden>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Yeni analiz</h2>
+        <p class="note" style="margin:0 0 10px">Mevcut analizi temizler. GitHub'daki kayıt etkilenmez.</p>
+        <button class="btn danger" data-act="reset">Yeni analiz başlat</button>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+(()=>{
+'use strict';
+
+/* ---------- Sabitler ---------- */
+const YIL={cok:2,tehlikeli:4,az:6};
+const SINIF_AD={cok:'Çok tehlikeli',tehlikeli:'Tehlikeli',az:'Az tehlikeli'};
+const DURUM=['Açık','Devam ediyor','Tamamlandı'];
+const LV=[
+  {n:1,min:1, max:4, ad:'Önemsiz'},
+  {n:2,min:5, max:9, ad:'Düşük'},
+  {n:3,min:10,max:14,ad:'Orta'},
+  {n:4,min:15,max:19,ad:'Yüksek'},
+  {n:5,min:20,max:25,ad:'Çok yüksek'}
+];
+const level=s=>LV.find(l=>s<=l.max);
+const NUM=['o','s','o2','s2'];
+
+/* ---------- Yardımcılar ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const getP=(o,p)=>p.split('.').reduce((a,k)=>a?.[k],o);
+const setP=(o,p,v)=>{const k=p.split('.');const l=k.pop();k.reduce((a,x)=>a[x],o)[l]=v};
+const fmt=iso=>{if(!iso)return '';const [y,m,d]=iso.split('-');return `${d}.${m}.${y}`};
+const slug=s=>(s||'').toLowerCase().replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),3200)}
+
+/* ---------- Veri ---------- */
+const blankRisk=()=>({bolum:'',tehlike:'',risk:'',etkilenen:'',o:'',s:'',tedbir:'',o2:'',s2:'',sorumlu:'',tarih:'',durum:'Açık'});
+const blank=()=>({v:1,firma:{unvan:'',adres:'',faaliyet:'',isveren:'',uzman:'',hekim:''},ekip:[],analiz:{sinif:'',tarih:'',revNo:'',revTarih:''},risks:[]});
+function normalize(d){
+  const b=blank();
+  return {...b,...d,
+    firma:{...b.firma,...(d.firma||{})},
+    analiz:{...b.analiz,...(d.analiz||{})},
+    ekip:Array.isArray(d.ekip)?d.ekip:[],
+    risks:(Array.isArray(d.risks)?d.risks:[]).map(r=>({...blankRisk(),...r}))};
+}
+let S;
+try{S=normalize(JSON.parse(localStorage.getItem('isg_risk_v1')||'{}'))}catch{S=blank()}
+
+let saveT;
+function changed(){
+  clearTimeout(saveT);
+  saveT=setTimeout(()=>{
+    try{localStorage.setItem('isg_risk_v1',JSON.stringify(S));
+      $('#saved').textContent='Tarayıcıya kaydedildi '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+    }catch{$('#saved').textContent='Tarayıcıya kaydedilemedi'}
+  },300);
+}
+
+/* ---------- Ayarlar (anahtarlar) ---------- */
+let set={geminiKey:'',model:'gemini-3.5-flash',remember:false,ghToken:'',ghOwner:'',ghRepo:'',ghBranch:'main',ghPath:''};
+try{
+  Object.assign(set,JSON.parse(localStorage.getItem('isg_pub')||'{}'));
+  Object.assign(set,JSON.parse(localStorage.getItem('isg_sec')||sessionStorage.getItem('isg_sec')||'{}'));
+}catch{}
+if(!/^gemini-3/i.test(set.model||''))set.model='gemini-3.5-flash';
+function saveSettings(){
+  const {geminiKey,ghToken,...pub}=set;
+  try{
+    localStorage.setItem('isg_pub',JSON.stringify(pub));
+    const sec=JSON.stringify({geminiKey,ghToken});
+    if(set.remember){localStorage.setItem('isg_sec',sec);sessionStorage.removeItem('isg_sec')}
+    else{sessionStorage.setItem('isg_sec',sec);localStorage.removeItem('isg_sec')}
+  }catch{}
+}
+
+/* ---------- Sekmeler ---------- */
+function showTab(name){
+  $$('.tab').forEach(t=>t.hidden=t.id!=='tab-'+name);
+  $$('nav button').forEach(b=>b.setAttribute('aria-current',String(b.dataset.tab===name)));
+  if(name==='risk'){renderRisks();renderMatrix()}
+  if(name==='asistan'){renderChat();$('#aiSet').open=!set.geminiKey}
+  window.scrollTo(0,0);
+}
+
+/* ---------- Firma / ekip / geçerlilik ---------- */
+function fillForm(){
+  $$('[data-bind]').forEach(el=>el.value=getP(S,el.dataset.bind)||'');
+  $$('[data-set]').forEach(el=>{const v=set[el.dataset.set];if(el.type==='checkbox')el.checked=!!v;else el.value=v||''});
+}
+function renderEkip(){
+  $('#ekip').innerHTML=S.ekip.map((e,i)=>`
+    <div class="ekip-row">
+      <div><label>Unvan</label><input data-ek="${i}.unvan" value="${esc(e.unvan)}" placeholder="Örn: Çalışan temsilcisi"></div>
+      <div><label>Ad soyad</label><input data-ek="${i}.ad" value="${esc(e.ad)}"></div>
+      <button class="btn danger sm" data-act="delEkip" data-i="${i}" aria-label="Ekip üyesini sil">Sil</button>
+    </div>`).join('')||'<p class="note" style="margin:0 0 10px">Henüz ek ekip üyesi yok.</p>';
+}
+function endDate(iso,yrs){
+  const [y,m,d]=iso.split('-').map(Number);
+  return new Date(y+yrs,m-1,d);
+}
+function endISO(){
+  const a=S.analiz,yrs=YIL[a.sinif];
+  if(!yrs||!a.tarih)return '';
+  const e=endDate(a.tarih,yrs);
+  return `${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,'0')}-${String(e.getDate()).padStart(2,'0')}`;
+}
+function validity(){
+  const box=$('#validity'),a=S.analiz,yrs=YIL[a.sinif];
+  box.classList.remove('bad');
+  if(!a.sinif){box.textContent='Geçerlilik süresi tehlike sınıfına göre hesaplanır: çok tehlikeli 2 yıl, tehlikeli 4 yıl, az tehlikeli 6 yıl.';return}
+  if(!a.tarih){box.textContent=`${SINIF_AD[a.sinif]} işyerinde geçerlilik süresi ${yrs} yıldır. Bitiş tarihi için risk analizi tarihini girin.`;return}
+  const end=endISO();
+  let txt=`${SINIF_AD[a.sinif]} işyeri: geçerlilik süresi ${yrs} yıl. Analiz ${fmt(end)} tarihine kadar geçerlidir.`;
+  if(end<todayISO()){txt+=' Süre dolmuş; analizin yenilenmesi gerekir.';box.classList.add('bad')}
+  if(a.revNo||a.revTarih)txt+=` Revizyon ${a.revNo||'-'}${a.revTarih?' ('+fmt(a.revTarih)+')':''}.`;
+  box.textContent=txt;
+}
+
+/* ---------- Risk tablosu ---------- */
+const sel=(i,f,val)=>`<select data-i="${i}" data-f="${f}" aria-label="${f}"><option value=""></option>${[1,2,3,4,5].map(n=>`<option${val==n?' selected':''}>${n}</option>`).join('')}</select>`;
+const ta=(i,f,v,rows=3)=>`<textarea rows="${rows}" data-i="${i}" data-f="${f}">${esc(v)}</textarea>`;
+function rowHTML(r,i){
+  return `<tr data-i="${i}">
+    <td class="idx">${i+1}</td>
+    <td class="c-t">${ta(i,'bolum',r.bolum)}</td>
+    <td class="c-t">${ta(i,'tehlike',r.tehlike)}</td>
+    <td class="c-t">${ta(i,'risk',r.risk)}</td>
+    <td class="c-t">${ta(i,'etkilenen',r.etkilenen)}</td>
+    <td class="c-n">${sel(i,'o',r.o)}</td>
+    <td class="c-n">${sel(i,'s',r.s)}</td>
+    <td class="c-sc" data-out="a"></td>
+    <td class="c-ted">${ta(i,'tedbir',r.tedbir,4)}</td>
+    <td class="c-n">${sel(i,'o2',r.o2)}</td>
+    <td class="c-n">${sel(i,'s2',r.s2)}</td>
+    <td class="c-sc" data-out="b"></td>
+    <td class="c-d"><input data-i="${i}" data-f="sorumlu" value="${esc(r.sorumlu)}"></td>
+    <td class="c-d"><input type="date" data-i="${i}" data-f="tarih" value="${esc(r.tarih)}"></td>
+    <td class="c-d"><select data-i="${i}" data-f="durum">${DURUM.map(d=>`<option${r.durum===d?' selected':''}>${d}</option>`).join('')}</select></td>
+    <td class="c-x"><button class="btn danger sm" data-act="del" data-i="${i}" aria-label="Maddeyi sil">Sil</button></td>
+  </tr>`;
+}
+function setBadge(td,s){
+  if(!s){td.innerHTML='<span class="dash">–</span>';return}
+  const l=level(s);
+  td.innerHTML=`<span class="badge lv${l.n}">${s}</span><small>${l.ad}</small>`;
+}
+function updRow(tr,r){
+  setBadge($('[data-out="a"]',tr),r.o&&r.s?r.o*r.s:0);
+  setBadge($('[data-out="b"]',tr),r.o2&&r.s2?r.o2*r.s2:0);
+}
+function renderRisks(){
+  const w=$('#riskWrap');
+  if(!S.risks.length){
+    w.innerHTML=`<div class="panel empty"><p>Henüz risk maddesi yok. Asistanla sorulu cevaplı başlayabilir ya da maddeyi elle ekleyebilirsiniz.</p>
+      <div class="actions"><button class="btn" data-act="goAI">Asistanla başla</button><button class="btn ghost" data-act="addRisk">Elle madde ekle</button></div></div>`;
+    return;
+  }
+  w.innerHTML=`<div class="tw"><table class="rt">
+    <thead>
+      <tr><th></th><th colspan="4">Tehlike ve risk</th><th colspan="3">Mevcut durum</th><th>Tedbir</th><th colspan="3">Faaliyet sonrası</th><th colspan="3">Takip</th><th></th></tr>
+      <tr><th>No</th><th>Bölüm / faaliyet</th><th>Tehlike</th><th>Risk</th><th>Etkilenenler</th><th>Olasılık</th><th>Şiddet</th><th>Risk skoru</th>
+      <th>Alınması gereken tedbirler</th><th>Olasılık</th><th>Şiddet</th><th>Risk skoru</th><th>Sorumlu kişi</th><th>Faaliyet tarihi</th><th>Son durum</th><th></th></tr>
+    </thead>
+    <tbody>${S.risks.map(rowHTML).join('')}</tbody></table></div>`;
+  $$('#riskWrap tbody tr').forEach(tr=>updRow(tr,S.risks[+tr.dataset.i]));
+}
+function renderMatrix(){
+  const mode=$('.seg [aria-pressed="true"]').dataset.mode;
+  const cnt={},lvc={1:0,2:0,3:0,4:0,5:0},lvn={1:0,2:0,3:0,4:0,5:0};
+  S.risks.forEach(r=>{
+    if(r.o&&r.s){lvn[level(r.o*r.s).n]++}
+    if(r.o2&&r.s2){lvc[level(r.o2*r.s2).n]++}
+    const o=+(mode==='now'?r.o:r.o2),s=+(mode==='now'?r.s:r.s2);
+    if(o&&s){const k=s+'-'+o;cnt[k]=(cnt[k]||0)+1}
+  });
+  let h='<div class="mx" role="img" aria-label="5x5 risk matrisi">';
+  for(let s=5;s>=1;s--){
+    h+=`<div class="mx-h">${s}</div>`;
+    for(let o=1;o<=5;o++){
+      const sc=o*s,c=cnt[s+'-'+o]||0;
+      h+=`<div class="mx-c lv${level(sc).n}" title="Olasılık ${o} × Şiddet ${s} = ${sc}"><span class="mx-s">${sc}</span>${c?`<b class="mx-n">${c}</b>`:''}</div>`;
+    }
+  }
+  h+='<div></div>'+[1,2,3,4,5].map(o=>`<div class="mx-h">${o}</div>`).join('');
+  h+='<div></div><div class="mx-ax">Olasılık (yatay) · Şiddet (dikey)</div></div>';
+  $('#matrix').innerHTML=h;
+  $('#dist').innerHTML=`<table class="dist"><thead><tr><th>Seviye</th><th>Skor</th><th>Mevcut</th><th>Faaliyet sonrası</th></tr></thead><tbody>${
+    LV.map(l=>`<tr><td><span class="chip lv${l.n}"></span>${l.ad}</td><td>${l.min}–${l.max}</td><td>${lvn[l.n]}</td><td>${lvc[l.n]}</td></tr>`).join('')}</tbody></table>
+    <p class="note">Hücrelerdeki büyük sayı, o hücreye düşen madde sayısıdır.</p>`;
+}
+
+/* ---------- Yapay zeka asistanı ---------- */
+let chat=[],busy=false;
+const F='`'.repeat(3);
+function sysPrompt(){
+  const f=S.firma,a=S.analiz;
+  return "Sen Türkiye'de çalışan deneyimli bir iş güvenliği uzmanısın ve 5x5 matris (L tipi) yöntemiyle risk değerlendirmesi hazırlamaya yardım ediyorsun. Türkçe yanıt ver.\n\n"+
+  `Firma: ${f.unvan||'-'}\nFaaliyet konusu: ${f.faaliyet||'-'}\nTehlike sınıfı: ${SINIF_AD[a.sinif]||'-'}\n\n`+
+  "Çalışma şeklin:\n"+
+  "1. Analiz edilecek bölüm veya faaliyet hakkında kullanıcıya soru sor. Bir seferde en fazla 3 kısa soru sor (ekipman/makine/kimyasal, çalışan sayısı ve vardiya, mevcut önlemler, geçmiş kazalar gibi).\n"+
+  "2. Yeterli bilgi olunca ya da kullanıcı isteyince risk maddelerini üret. Yanıtının sonuna tek bir "+F+"json bloğu ekle ve tam olarak şu biçimi kullan:\n"+
+  F+'json\n{"maddeler":[{"bolum":"","tehlike":"","risk":"","etkilenen":"","olasilik":3,"siddet":4,"tedbir":"","olasilik2":1,"siddet2":4}]}\n'+F+"\n\n"+
+  "Ölçekler:\n- Olasılık: 1 çok düşük, 2 düşük, 3 orta, 4 yüksek, 5 çok yüksek/kaçınılmaz.\n"+
+  "- Şiddet: 1 çok hafif (ilk yardım gerektirmez), 2 hafif (ilk yardım), 3 orta (tedavi/iş günü kaybı), 4 ciddi (kalıcı iş göremezlik, uzuv kaybı), 5 çok ciddi (ölüm).\n"+
+  "- Risk skoru = olasılık × şiddet.\n\n"+
+  "Kurallar:\n- tehlike: kaynağı kısa yaz (ör. dönen makine parçaları). risk: sonucu yaz (ör. uzuv sıkışması, yaralanma). etkilenen: kimler etkilenir.\n"+
+  "- tedbir: koruma hiyerarşisine göre (ortadan kaldırma, ikame, mühendislik, idari, KKD) her tedbiri ayrı satırda \"- \" ile yaz.\n"+
+  "- olasilik2 ve siddet2: tedbirler uygulandıktan sonra gerçekçi olarak beklenen değerler.\n"+
+  "- Emin olmadığın mevzuat madde numarası uydurma; gerekirse genel olarak 6331 sayılı Kanun ve ilgili yönetmelik diye an.\n"+
+  "- Kullanıcı bir maddeyi düzeltirse güncel json bloğunu yeniden ver.";
+}
+const cl=v=>{v=Math.round(+v);return v>=1&&v<=5?v:''};
+function parseItems(text){
+  const m=text.match(/```json\s*([\s\S]*?)```/i);
+  if(!m)return [];
+  try{
+    const j=JSON.parse(m[1]);
+    const arr=Array.isArray(j)?j:(j.maddeler||[]);
+    return arr.map(x=>({bolum:x.bolum||'',tehlike:x.tehlike||'',risk:x.risk||'',etkilenen:x.etkilenen||'',
+      o:cl(x.olasilik),s:cl(x.siddet),
+      tedbir:Array.isArray(x.tedbir)?x.tedbir.map(t=>'- '+String(t).replace(/^-\s*/,'')).join('\n'):(x.tedbir||''),
+      o2:cl(x.olasilik2),s2:cl(x.siddet2)}));
+  }catch{return []}
+}
+function renderChat(){
+  const box=$('#msgs');
+  if(!chat.length){
+    box.innerHTML=`<div class="empty"><p>Analize başlamak için bir mesaj yazın veya aşağıdakilerden birini seçin.</p>
+      <div class="actions">
+        <button class="btn ghost" data-act="chip" data-t="Risk analizine başlayalım. Bana gerekli soruları sor.">Sorularla başla</button>
+        <button class="btn ghost" data-act="chip" data-t="Firma faaliyetime göre analiz edilmesi gereken bölümleri listele.">Bölümleri listele</button>
+      </div></div>`;
+    return;
+  }
+  box.innerHTML=chat.map((m,mi)=>{
+    if(m.role==='user')return `<div class="msg u">${esc(m.content)}</div>`;
+    const text=m.content.replace(/```json[\s\S]*?```/gi,'').trim();
+    let h=`<div class="msg a${m.err?' err':''}">${esc(text)||'Maddeler hazır.'}`;
+    if(m.items&&m.items.length){
+      h+=`<div class="prop">`+m.items.map((it,k)=>{
+        const sc=it.o&&it.s?it.o*it.s:0;
+        return `<label class="pi"><input type="checkbox" data-pm="${mi}" data-pi="${k}" checked${m.added?' disabled':''}>
+          <span><b>${esc(it.tehlike)}</b><br>${esc(it.risk)}</span>${sc?`<span class="badge lv${level(sc).n}">${sc}</span>`:'<span></span>'}</label>`}).join('')+
+        `<div class="actions"><button class="btn sm" data-act="addSel" data-m="${mi}"${m.added?' disabled':''}>${m.added?'Tabloya eklendi':'Seçilenleri tabloya ekle'}</button></div></div>`;
+    }
+    return h+'</div>';
+  }).join('')+(busy?'<div class="msg a typing">Asistan yazıyor…</div>':'');
+  box.scrollTop=box.scrollHeight;
+}
+async function send(text){
+  text=(text||'').trim();
+  if(!text||busy)return;
+  if(!set.geminiKey){$('#aiSet').open=true;toast('Önce Gemini API anahtarınızı girin.');$('#s-key').focus();return}
+  chat.push({role:'user',content:text});
+  busy=true;renderChat();$('#chatIn').value='';
+  try{
+    const contents=chat.filter(m=>!m.err).map(m=>({role:m.role==='user'?'user':'model',parts:[{text:m.content}]}));
+    const model=encodeURIComponent(set.model||'gemini-3.5-flash');
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-goog-api-key':set.geminiKey},
+      body:JSON.stringify({systemInstruction:{parts:[{text:sysPrompt()}]},contents,generationConfig:{temperature:0.4}})
+    });
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error?.message||('HTTP '+r.status));
+    const c=(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
+    if(!c)throw new Error('Boş yanıt döndü'+(j.promptFeedback?.blockReason?' ('+j.promptFeedback.blockReason+')':'')+'.');
+    chat.push({role:'assistant',content:c,items:parseItems(c)});
+  }catch(e){
+    chat.push({role:'assistant',content:'İstek başarısız: '+e.message+' API anahtarını ve model adını kontrol edin.',err:true});
+  }
+  busy=false;renderChat();
+}
+
+/* ---------- Excel ---------- */
+const XC={brand:'0F4C5C',brand2:'0B3742',signal:'F5B700',line:'D2DAD9',ink:'14262B',muted:'5A6B70',paper:'FFFFFF',tint:'EDF0EF'};
+const LVX={1:{bg:'2F8F58',fg:'FFFFFF'},2:{bg:'A9C94B',fg:'14262B'},3:{bg:'F3C433',fg:'14262B'},4:{bg:'EE8B2C',fg:'14262B'},5:{bg:'C93A2A',fg:'FFFFFF'}};
+const NCOLS=17;
+function exportXlsx(){
+  if(typeof XLSX==='undefined'){toast('Excel kütüphanesi yüklenemedi. İnternet bağlantısını kontrol edin.');return}
+  const f=S.firma,a=S.analiz,yrs=YIL[a.sinif]||'';
+  const thin={style:'thin',color:{rgb:XC.line}};
+  const box={top:thin,bottom:thin,left:thin,right:thin};
+  const bottomOnly={bottom:{style:'medium',color:{rgb:XC.brand}}};
+  const grid=[],heights=[],merges=[];
+  const R=()=>grid.length; // index of the row about to be pushed
+  const blankRow=(n=1)=>{const row=Array(NCOLS).fill(null).map(()=>({v:'',t:'s',s:{}}));grid.push(row);heights.push(n)};
+  const put=(r,c,v,s)=>{grid[r][c]={v:v==null?'':v,t:typeof v==='number'?'n':'s',s:s||{}}};
+  const mergeRow=(r,c1,c2,v,s,h)=>{merges.push({s:{r,c:c1},e:{r,c:c2}});for(let c=c1;c<=c2;c++)put(r,c,c===c1?v:'',s);};
+  const emptyRow=()=>Array(NCOLS).fill(null).map(()=>({v:'',t:'s',s:{}}));
+
+  // Firma unvanı
+  grid.push(emptyRow());heights.push(30);
+  mergeRow(R()-1,0,NCOLS-1,f.unvan||'Firma unvanı girilmedi',{font:{bold:true,sz:18,color:{rgb:XC.brand}},alignment:{horizontal:'center',vertical:'center'}});
+
+  // Başlık
+  grid.push(emptyRow());heights.push(24);
+  mergeRow(R()-1,0,NCOLS-1,'RİSK DEĞERLENDİRME RAPORU',{font:{bold:true,sz:14,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:XC.brand}},alignment:{horizontal:'center',vertical:'center'}});
+
+  // Bilgi satırı
+  const infoParts=[`Tehlike sınıfı: ${SINIF_AD[a.sinif]||'-'}`,`Analiz tarihi: ${fmt(a.tarih)||'-'}`,
+    `Geçerlilik: ${yrs?yrs+' yıl':'-'}`,`Geçerlilik bitişi: ${fmt(endISO())||'-'}`,
+    ...(a.revNo||a.revTarih?[`Revizyon: ${a.revNo||'-'}${a.revTarih?' ('+fmt(a.revTarih)+')':''}`]:[]),
+    `Faaliyet konusu: ${f.faaliyet||'-'}`,`Adres: ${f.adres||'-'}`];
+  grid.push(emptyRow());heights.push(16);
+  mergeRow(R()-1,0,NCOLS-1,infoParts.join('   ·   '),{font:{italic:true,sz:9.5,color:{rgb:XC.muted}},alignment:{horizontal:'center',vertical:'center'}});
+
+  blankRow(6);
+
+  // Ekip başlığı
+  grid.push(emptyRow());heights.push(18);
+  mergeRow(R()-1,0,NCOLS-1,'RİSK DEĞERLENDİRME EKİBİ',{font:{bold:true,sz:11,color:{rgb:XC.brand}},border:{bottom:{style:'thin',color:{rgb:XC.brand}}},alignment:{horizontal:'left',vertical:'center'}});
+
+  const ekip=[
+    {u:'İşveren',a:f.isveren},{u:'İş güvenliği uzmanı',a:f.uzman},{u:'İşyeri hekimi',a:f.hekim},
+    ...S.ekip.filter(x=>x.ad||x.unvan).map(x=>({u:x.unvan||'Ekip üyesi',a:x.ad}))
+  ].filter(x=>x.a||x.u);
+  const teamHeadStyle={font:{bold:true,sz:9,color:{rgb:XC.muted}},fill:{patternType:'solid',fgColor:{rgb:XC.tint}},border:box,alignment:{horizontal:'left',vertical:'center'}};
+  grid.push(emptyRow());heights.push(14);
+  mergeRow(R()-1,0,3,'Unvan',teamHeadStyle);mergeRow(R()-1,4,10,'Ad Soyad',teamHeadStyle);mergeRow(R()-1,11,16,'İmza',teamHeadStyle);
+  ekip.forEach(m=>{
+    grid.push(emptyRow());heights.push(22);
+    const r=R()-1;
+    mergeRow(r,0,3,m.u,{font:{sz:10,color:{rgb:XC.ink}},border:box,alignment:{horizontal:'left',vertical:'center'}});
+    mergeRow(r,4,10,m.a,{font:{sz:10,bold:true,color:{rgb:XC.ink}},border:box,alignment:{horizontal:'left',vertical:'center'}});
+    mergeRow(r,11,16,'',{border:box});
+  });
+  if(!ekip.length){grid.push(emptyRow());heights.push(22);mergeRow(R()-1,0,16,'Ekip üyesi girilmedi',{font:{italic:true,sz:10,color:{rgb:XC.muted}},border:box});}
+
+  blankRow(6);
+
+  // Risk seviyesi lejandı
+  grid.push(emptyRow());heights.push(18);
+  put(R()-1,0,'',{});mergeRow(R()-1,0,1,'Risk seviyesi:',{font:{bold:true,sz:9,color:{rgb:XC.muted}},alignment:{horizontal:'left',vertical:'center'}});
+  LV.forEach((l,i)=>{
+    const r=R()-1,c0=2+i*3;
+    put(r,c0,'',{fill:{patternType:'solid',fgColor:{rgb:LVX[l.n].bg}},border:box});
+    mergeRow(r,c0+1,c0+2,`${l.min}-${l.max} ${l.ad}`,{font:{sz:8.5,color:{rgb:XC.ink}},alignment:{horizontal:'left',vertical:'center'}});
+  });
+
+  blankRow(6);
+
+  // Tablo başlığı
+  const head=['Sıra','Bölüm / Faaliyet','Tehlike','Risk','Etkilenenler','Olasılık','Şiddet','Risk Skoru','Risk Seviyesi',
+    'Alınması Gereken Tedbirler','Olasılık','Şiddet','Risk Skoru','Risk Seviyesi','Sorumlu Kişi','Faaliyet Tarihi','Son Durum'];
+  grid.push(emptyRow());heights.push(30);
+  const headRowIdx=R()-1;
+  const hs={font:{bold:true,sz:9.5,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:XC.brand}},border:box,alignment:{horizontal:'center',vertical:'center',wrapText:true}};
+  head.forEach((h,c)=>put(headRowIdx,c,h,hs));
+
+  // Grup başlığı (mevcut durum / faaliyet sonrası) için ekstra bilgi satırı yerine ilk satıra dahil edildi.
+
+  // Veri satırları
+  const dataStart=R();
+  S.risks.forEach((r,i)=>{
+    const s1=r.o&&r.s?r.o*r.s:'',s2=r.o2&&r.s2?r.o2*r.s2:'';
+    grid.push(emptyRow());heights.push(52);
+    const rr=R()-1;
+    const base={border:box,alignment:{vertical:'top',wrapText:true},font:{sz:9.5,color:{rgb:XC.ink}}};
+    const center={...base,alignment:{...base.alignment,horizontal:'center'}};
+    put(rr,0,i+1,center);
+    put(rr,1,r.bolum,base);put(rr,2,r.tehlike,base);put(rr,3,r.risk,base);put(rr,4,r.etkilenen,base);
+    put(rr,5,r.o||'',center);put(rr,6,r.s||'',center);
+    put(rr,7,s1||'',s1?{...center,font:{bold:true,sz:11,color:{rgb:LVX[level(s1).n].fg}},fill:{patternType:'solid',fgColor:{rgb:LVX[level(s1).n].bg}}}:center);
+    put(rr,8,s1?level(s1).ad:'',s1?{...center,font:{sz:8.5,color:{rgb:XC.ink}},fill:{patternType:'solid',fgColor:{rgb:LVX[level(s1).n].bg}}}:center);
+    put(rr,9,r.tedbir,base);
+    put(rr,10,r.o2||'',center);put(rr,11,r.s2||'',center);
+    put(rr,12,s2||'',s2?{...center,font:{bold:true,sz:11,color:{rgb:LVX[level(s2).n].fg}},fill:{patternType:'solid',fgColor:{rgb:LVX[level(s2).n].bg}}}:center);
+    put(rr,13,s2?level(s2).ad:'',s2?{...center,font:{sz:8.5,color:{rgb:XC.ink}},fill:{patternType:'solid',fgColor:{rgb:LVX[level(s2).n].bg}}}:center);
+    put(rr,14,r.sorumlu,base);put(rr,15,fmt(r.tarih),center);put(rr,16,r.durum,center);
+  });
+  if(!S.risks.length){
+    grid.push(emptyRow());heights.push(22);
+    mergeRow(R()-1,0,16,'Risk maddesi girilmedi.',{font:{italic:true,sz:10,color:{rgb:XC.muted}},border:box,alignment:{horizontal:'center'}});
+  }
+
+  const ws=XLSX.utils.aoa_to_sheet(grid.map(row=>row.map(c=>c.v)));
+  grid.forEach((row,r)=>row.forEach((c,ci)=>{const ref=XLSX.utils.encode_cell({r,c:ci});if(!ws[ref])ws[ref]={t:'s',v:''};ws[ref].s=c.s;}));
+  ws['!merges']=merges;
+  ws['!cols']=[6,24,28,28,20,8,8,10,12,44,8,8,10,12,20,13,13].map(w=>({wch:w}));
+  ws['!rows']=heights.map(h=>({hpt:h}));
+  ws['!margins']={left:0.3,right:0.3,top:0.35,bottom:0.35,header:0.2,footer:0.2};
+  ws['!pageSetup']={orientation:'landscape',fitToWidth:1,fitToHeight:0,scale:62};
+  ws['!printOptions']={gridLines:false};
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:headRowIdx,c:0},e:{r:headRowIdx,c:NCOLS-1}})};
+  ws['!views']=[{state:'frozen',ySplit:headRowIdx+1,topLeftCell:XLSX.utils.encode_cell({r:dataStart,c:0}),activePane:'bottomLeft'}];
+  const wb=XLSX.utils.book_new();
+  wb.Workbook={Views:[{RTL:false}],Names:[{Sheet:0,Name:'_xlnm.Print_Titles',Ref:`'Risk Analizi'!$1:$${headRowIdx+1}`}]};
+  XLSX.utils.book_append_sheet(wb,ws,'Risk Analizi');
+  XLSX.writeFile(wb,`Risk_Analizi_${slug(f.unvan)||'firma'}_${a.tarih||todayISO()}.xlsx`);
+}
+
+/* ---------- JSON / GitHub ---------- */
+const payload=()=>JSON.stringify({...S,savedAt:new Date().toISOString()},null,2);
+function download(name,text,type){
+  const u=URL.createObjectURL(new Blob([text],{type}));
+  const a=document.createElement('a');a.href=u;a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+const enc=s=>{const b=new TextEncoder().encode(s);let bin='';for(let i=0;i<b.length;i+=0x8000)bin+=String.fromCharCode(...b.subarray(i,i+0x8000));return btoa(bin)};
+const dec=b=>{const bin=atob(b.replace(/\s/g,''));return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)))};
+const ghMsg=t=>{$('#ghMsg').textContent=t};
+function ghUrl(){
+  const path=(set.ghPath||`risk-analizleri/${slug(S.firma.unvan)||'risk-analizi'}.json`).replace(/^\/+/,'');
+  return {path,url:`https://api.github.com/repos/${encodeURIComponent(set.ghOwner)}/${encodeURIComponent(set.ghRepo)}/contents/${path.split('/').map(encodeURIComponent).join('/')}`};
+}
+async function gh(method,url,body){
+  const r=await fetch(url,{method,headers:{'Authorization':'Bearer '+set.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error(j.message||('HTTP '+r.status));e.status=r.status;throw e}
+  return j;
+}
+function ghReady(){
+  if(!set.ghToken||!set.ghOwner||!set.ghRepo){ghMsg('Erişim anahtarı, kullanıcı ve depo adını girin.');return false}
+  return true;
+}
+async function ghSave(){
+  if(!ghReady())return;
+  const {path,url}=ghUrl(),br=set.ghBranch||'main';
+  ghMsg('Kaydediliyor…');
+  try{
+    let sha;
+    try{sha=(await gh('GET',url+'?ref='+encodeURIComponent(br))).sha}catch(e){if(e.status!==404)throw e}
+    await gh('PUT',url,{message:`Risk analizi güncellendi: ${S.firma.unvan||'firma'} (${new Date().toLocaleString('tr-TR')})`,content:enc(payload()),branch:br,...(sha?{sha}:{})});
+    ghMsg(`Kaydedildi: ${set.ghOwner}/${set.ghRepo}/${path} (${br})`);
+    toast('GitHub\'a kaydedildi');
+  }catch(e){ghMsg('Kaydedilemedi: '+e.message)}
+}
+async function ghLoad(){
+  if(!ghReady())return;
+  const {path,url}=ghUrl(),br=set.ghBranch||'main';
+  ghMsg('Yükleniyor…');
+  try{
+    const j=await gh('GET',url+'?ref='+encodeURIComponent(br));
+    S=normalize(JSON.parse(dec(j.content)));
+    renderAll();changed();
+    ghMsg(`Yüklendi: ${path}`);toast('GitHub\'dan yüklendi');
+  }catch(e){ghMsg(e.status===404?'Bu yolda kayıt bulunamadı.':'Yüklenemedi: '+e.message)}
+}
+
+/* ---------- Olaylar ---------- */
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset.bind){setP(S,t.dataset.bind,t.value);validity();changed()}
+  else if(t.dataset.set){set[t.dataset.set]=t.type==='checkbox'?t.checked:t.value;saveSettings()}
+  else if(t.dataset.ek){const [i,f]=t.dataset.ek.split('.');S.ekip[+i][f]=t.value;changed()}
+  else if(t.dataset.f&&t.dataset.i!==undefined){
+    const i=+t.dataset.i,f=t.dataset.f;
+    S.risks[i][f]=NUM.includes(f)?(t.value===''?'':+t.value):t.value;
+    updRow(t.closest('tr'),S.risks[i]);renderMatrix();changed();
+  }
+});
+document.addEventListener('click',e=>{
+  const tabBtn=e.target.closest('nav button');
+  if(tabBtn){showTab(tabBtn.dataset.tab);return}
+  const b=e.target.closest('[data-act]');
+  if(!b)return;
+  const act=b.dataset.act;
+  if(act==='addEkip'){S.ekip.push({unvan:'',ad:''});renderEkip();changed()}
+  else if(act==='delEkip'){S.ekip.splice(+b.dataset.i,1);renderEkip();changed()}
+  else if(act==='addRisk'){S.risks.push(blankRisk());renderRisks();renderMatrix();changed();
+    const tw=$('.tw');if(tw)tw.scrollTop=tw.scrollHeight}
+  else if(act==='del'){if(confirm('Bu madde silinsin mi?')){S.risks.splice(+b.dataset.i,1);renderRisks();renderMatrix();changed()}}
+  else if(act==='mx'){$$('.seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));renderMatrix()}
+  else if(act==='goAI')showTab('asistan');
+  else if(act==='send')send($('#chatIn').value);
+  else if(act==='chip')send(b.dataset.t);
+  else if(act==='clearChat'){if(!chat.length||confirm('Sohbet temizlensin mi? Tabloya eklenen maddeler silinmez.')){chat=[];renderChat()}}
+  else if(act==='addSel'){
+    const mi=+b.dataset.m,m=chat[mi];
+    const idx=$$(`input[data-pm="${mi}"]:checked`).map(x=>+x.dataset.pi);
+    if(!idx.length){toast('Eklenecek madde seçin.');return}
+    idx.forEach(k=>S.risks.push({...blankRisk(),...m.items[k]}));
+    m.added=true;renderChat();changed();
+    toast(`${idx.length} madde tabloya eklendi`);
+  }
+  else if(act==='xlsx')exportXlsx();
+  else if(act==='jsonDown')download(`risk-analizi-${slug(S.firma.unvan)||'firma'}.json`,payload(),'application/json');
+  else if(act==='jsonUp')$('#jsonFile').click();
+  else if(act==='ghSave')ghSave();
+  else if(act==='ghLoad')ghLoad();
+  else if(act==='reset'){if(confirm('Mevcut analiz temizlensin mi? Bu işlem geri alınamaz.')){S=blank();chat=[];renderAll();changed();toast('Yeni analiz başlatıldı')}}
+});
+$('#jsonFile').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  file.text().then(t=>{S=normalize(JSON.parse(t));renderAll();changed();toast('Dosya yüklendi')}).catch(()=>toast('Dosya okunamadı.'));
+  e.target.value='';
+});
+$('#chatIn').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send($('#chatIn').value)}
+});
+
+function renderAll(){fillForm();renderEkip();validity();renderRisks();renderMatrix();renderChat()}
+renderAll();
+})();
+</script>
+</body>
+</html>

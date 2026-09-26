@@ -1,9 +1,0 @@
-{
-  "name": "karma-osgb-ziyaret-bildirimi",
-  "private": true,
-  "type": "module",
-  "description": "KARMA OSGB - her Cuma 17:00'de ziyaret edilmeyen firmaları e-posta ile bildiren betik",
-  "dependencies": {
-    "nodemailer": "^6.9.14"
-  }
-}

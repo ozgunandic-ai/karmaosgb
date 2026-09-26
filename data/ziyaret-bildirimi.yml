@@ -1,0 +1,46 @@
+name: Ziyaret Edilmeyen Firma Bildirimi
+
+# Her Cuma 14:00 UTC = 17:00 Türkiye saati (Türkiye yaz saati uygulamadığından
+# yıl boyu sabit UTC+3'tür, bu satırı değiştirmenize gerek yoktur).
+on:
+  schedule:
+    - cron: '0 14 * * 5'
+  # Zamanı beklemeden elle test etmek için: Actions sekmesi → bu workflow →
+  # "Run workflow" butonu. Gerçek mail göndermeden önizlemek isterseniz
+  # aşağıdaki "Bildirimleri gönder" adımına dry_run girişini "true" geçin.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'true ise mail göndermez, sadece içerikleri loglara yazar'
+        required: false
+        default: 'false'
+
+jobs:
+  bildir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Depoyu al
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Bağımlılıkları yükle
+        working-directory: scripts
+        run: npm install
+
+      - name: Bildirimleri gönder
+        working-directory: scripts
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+        run: node ziyaret-bildirimi.mjs

@@ -2597,25 +2597,38 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     });
   }
 
-  var FIRMA_ARA = '';
-  function firmaAraUygula() {
-    var q = trNorm(FIRMA_ARA), sat = $$('tr[data-ara]'), say = 0;
-    sat.forEach(function (tr) {
+  /* Firma arama (Firmalar ve Evrak Takip sayfaları): önek 'firma' veya 'evrak' */
+  var ARA_METIN = { firma: '', evrak: '' };
+  function firmaAraKutusu(on, yer) {
+    return '<div class="card" style="margin-bottom:12px"><div class="card-b" style="display:flex;gap:8px;align-items:center">' +
+      '<input id="' + on + 'Ara" type="search" autocomplete="off" placeholder="' + yer + '" style="flex:1" value="' + esc(ARA_METIN[on]) + '">' +
+      '<button type="button" class="btn btn-primary" id="' + on + 'AraBtn">Ara</button>' +
+      '<button type="button" class="btn btn-ghost" id="' + on + 'AraTemizle">Temizle</button></div>' +
+      '<div class="hint" id="' + on + 'AraSonuc" style="padding:0 16px 12px"></div></div>';
+  }
+  function firmaAraUygula(on) {
+    var q = trNorm(ARA_METIN[on]), say = 0;
+    $$('tr[data-ara]').forEach(function (tr) {
       var g = !q || q.split(' ').every(function (w) { return tr.getAttribute('data-ara').indexOf(w) >= 0; });
       tr.style.display = g ? '' : 'none'; if (g) say++;
     });
-    var r = $('#firmaAraSonuc'); if (r) r.textContent = q ? (say ? say + ' firma bulundu' : 'Eşleşen firma yok') : '';
+    var r = $('#' + on + 'AraSonuc'); if (r) r.textContent = q ? (say ? say + ' firma bulundu' : 'Eşleşen firma yok') : '';
   }
+  function firmaAraOn(id) { var m = /^(firma|evrak)Ara/.exec(id || ''); return m ? m[1] : null; }
   document.addEventListener('input', function (e) {
-    if (e.target && e.target.id === 'firmaAra') { FIRMA_ARA = e.target.value; firmaAraUygula(); }
+    var on = e.target && e.target.id === (firmaAraOn(e.target.id) + 'Ara') ? firmaAraOn(e.target.id) : null;
+    if (on) { ARA_METIN[on] = e.target.value; firmaAraUygula(on); }
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target && e.target.id === 'firmaAra') { e.preventDefault(); firmaAraUygula(); }
+    var on = e.key === 'Enter' && e.target && e.target.id === (firmaAraOn(e.target.id) + 'Ara') ? firmaAraOn(e.target.id) : null;
+    if (on) { e.preventDefault(); firmaAraUygula(on); }
   });
   document.addEventListener('click', function (e) {
-    var t = e.target && e.target.closest ? e.target.closest('#firmaAraBtn,#firmaAraTemizle') : null; if (!t) return;
-    var i = $('#firmaAra'); if (t.id === 'firmaAraTemizle') { FIRMA_ARA = ''; if (i) i.value = ''; } else if (i) FIRMA_ARA = i.value;
-    firmaAraUygula(); if (i) i.focus();
+    var t = e.target && e.target.closest ? e.target.closest('[id$="AraBtn"],[id$="AraTemizle"]') : null; if (!t) return;
+    var on = firmaAraOn(t.id); if (!on) return;
+    var i = $('#' + on + 'Ara');
+    if (/Temizle$/.test(t.id)) { ARA_METIN[on] = ''; if (i) i.value = ''; } else if (i) ARA_METIN[on] = i.value;
+    firmaAraUygula(on); if (i) i.focus();
   });
   function viewFirmalar() {
     var list = benimFirmalarim().slice().sort(function (a, b) { return (a.unvan || '').localeCompare(b.unvan || '', 'tr'); });
@@ -2624,12 +2637,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       (yonetimiMi() ? '<div class="pact"><button class="btn btn-primary" id="yeniFirma">Yeni firma</button></div>' : '') + '</div>';
 
     if (list.length) {
-      if (FIRMA_ARA) setTimeout(firmaAraUygula, 0);
-      h += '<div class="card" style="margin-bottom:12px"><div class="card-b" style="display:flex;gap:8px;align-items:center">' +
-        '<input id="firmaAra" type="search" autocomplete="off" placeholder="Firma ara: ünvan, kısaltma, işveren, faaliyet, uzman, hekim…" style="flex:1" value="' + esc(FIRMA_ARA) + '">' +
-        '<button type="button" class="btn btn-primary" id="firmaAraBtn">Ara</button>' +
-        '<button type="button" class="btn btn-ghost" id="firmaAraTemizle">Temizle</button></div>' +
-        '<div class="hint" id="firmaAraSonuc" style="padding:0 16px 12px"></div></div>';
+      if (ARA_METIN.firma) setTimeout(function () { firmaAraUygula('firma'); }, 0);
+      h += firmaAraKutusu('firma', 'Firma ara: ünvan, kısaltma, işveren, faaliyet, uzman, hekim…');
     }
     if (!list.length) {
       h += '<div class="card"><div class="empty"><h3>' + (yonetimiMi() ? 'Henüz firma eklenmedi' : 'Size atanmış firma yok') + '</h3>' +
@@ -4211,7 +4220,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     var diger = oturumDiger(o), th = oturumTehlike(o), temel = o.egitimTuru === 'temel';
 
     var firmaOpts = '<option value="">— firma seçin —</option>' +
-      firmalar.map(function (f) { return '<option value="' + esc(f._id) + '"' + (o.firmaId === f._id ? ' selected' : '') + '>' + esc(f.unvan) + '</option>'; }).join('') +
+      firmalar.map(function (f) { return '<option value="' + esc(f._id) + '"' + (o.firmaId === f._id ? ' selected' : '') + '>' + esc((f.kisaAd && f.kisaAd.trim() ? f.kisaAd.trim() + ' — ' : '') + f.unvan) + '</option>'; }).join('') +
       '<option value="__diger__"' + (diger ? ' selected' : '') + '>Diğer Firma (elle gir)</option>';
 
     var h = '<div class="crumb"><button data-goto="oturumlar">Eğitim kayıtları</button> › ' + esc(oturumFirmaUnvan(o) || 'Yeni kayıt') + '</div>' +
@@ -7203,6 +7212,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       return h + '<div class="card"><div class="empty"><h3>Gösterilecek firma yok</h3><p>' +
         (yon ? 'Bu kullanıcıya atanmış firma bulunmuyor.' : 'Size atanmış firma bulunmuyor.') + '</p></div></div>';
     }
+    if (ARA_METIN.evrak) setTimeout(function () { firmaAraUygula('evrak'); }, 0);
+    h += firmaAraKutusu('evrak', 'Firma ara: ünvan, kısaltma, uzman, hekim…');
     return h + '<div class="card"><div class="card-b tight" style="overflow-x:auto"><table class="tbl evrak-tbl"><thead><tr><th>Firma</th>' +
       EVRAK_TURLERI.map(function (t) { return '<th class="c">' + esc(t.l) + '</th>'; }).join('') + '<th class="c">Durum</th></tr></thead><tbody>' +
       firmalar.map(function (f) {
@@ -7214,7 +7225,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
             (n ? '✔' + (n > 1 ? '<small>' + n + '</small>' : '') : '✖') + '</button></td>';
         }).join('');
         var sorumlu = yon ? [f.uzman, f.hekim].filter(Boolean).join(' · ') : '';
-        return '<tr><td><strong' + (f.kisaAd ? ' title="' + esc(f.unvan) + '"' : '') + '>' + esc(firmaKisa(f)) + '</strong>' +
+        return '<tr data-ara="' + esc(trNorm([f.unvan, f.kisaAd, f.uzman, f.hekim, f.tehlike].join(' '))) + '"><td><strong' + (f.kisaAd ? ' title="' + esc(f.unvan) + '"' : '') + '>' + esc(firmaKisa(f)) + '</strong>' +
           (sorumlu ? '<div class="hint">' + esc(sorumlu) + '</div>' : '') + '</td>' + hucre +
           '<td class="c"><span class="evrak-skor' + (tamam === EVRAK_TURLERI.length ? ' tam' : '') + '">' + tamam + '/' + EVRAK_TURLERI.length + '</span></td></tr>';
       }).join('') + '</tbody></table></div></div>';

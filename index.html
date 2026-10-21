@@ -3555,7 +3555,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       (o.katilimcilar || []).forEach(function (k, i) {
         if (!k.adSoyad || !k.adSoyad.trim()) return;
         s.push({
-          kaynak: 'oturum', oturumId: o._id, kisiIdx: i, firmaId: diger ? '' : o.firmaId, diger: diger,
+          kaynak: 'oturum', oturumId: o._id, kisiIdx: i, olusturan: o.olusturan, firmaId: diger ? '' : o.firmaId, diger: diger,
           firmaAdi: oturumFirmaUnvan(o) || '(firma seçilmedi)', firmaKisa: oturumFirmaKisa(o) || '(firma seçilmedi)',
           firmaArama: [oturumFirmaUnvan(o), o.firmaKisaAd, (oturumDiger(o) ? '' : (oturumFirma(o) || {}).kisaAd)].join(' '),
           tehlike: oturumTehlike(o),
@@ -3700,7 +3700,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
             : (r.guncel ? '<div class="lst-durum">Geçerlilik sonu: ' + esc(trTarih(r.bitis)) + '</div>' : '<div class="lst-durum">Yenilendi</div>')));
         var aksiyon = r.kaynak === 'oturum'
           ? '<button class="btn btn-ghost btn-sm" data-liste-ac="' + esc(r.oturumId) + ':' + r.kisiIdx + '" title="' + (r.temel ? 'Eğitim belgesini aç' : 'Eğitim kaydını aç') + '">Aç</button> ' +
-            '<button class="btn btn-quiet btn-sm" data-oturum="' + esc(r.oturumId) + '" title="Eğitim kaydını düzenle">Düzenle</button>'
+            '<button class="btn btn-quiet btn-sm" data-oturum="' + esc(r.oturumId) + '" title="Eğitim kaydını düzenle">Düzenle</button>' +
+            (kayitSilebilirMi(r.olusturan) ? ' <button class="btn btn-danger btn-sm" data-osil="' + esc(r.oturumId) + ':' + r.kisiIdx + '" title="Bu kişiyi eğitim kaydından sil">Sil</button>' : '')
           : '<button class="btn btn-ghost btn-sm" disabled title="Elle/Excel ile girilmiş kayıt; belge yok">Aç</button>' +
             (kayitSilebilirMi(r.olusturan) ? ' <button class="btn btn-danger btn-sm" data-gsil="' + esc(r.gecmisId) + ':' + esc(r.satirId) + '">Sil</button>' : '');
         return '<tr class="' + (r.doldu ? 'satir-doldu' : (r.yaklasan ? 'satir-yaklasan' : '')) + '"><td>' + esc(tarih) + durum + '</td>' +
@@ -3745,6 +3746,27 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     $$('[data-liste-ac]').forEach(function (b) {
       b.addEventListener('click', function () {
         var p = b.getAttribute('data-liste-ac').split(':'); oturumBelgeAc(p[0], +p[1]);
+      });
+    });
+    $$('[data-osil]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var p = b.getAttribute('data-osil').split(':'), idx = +p[1];
+        var kayit = App.oturumlar.find(function (x) { return x._id === p[0]; });
+        if (!kayit || !kayit.katilimcilar || !kayit.katilimcilar[idx]) { toast('Kayıt bulunamadı', 'err'); return; }
+        if (!kayitSilebilirMi(kayit.olusturan)) { toast('Bu kaydı yalnızca oluşturan kullanıcı veya yönetici silebilir', 'err'); return; }
+        var ad = kayit.katilimcilar[idx].adSoyad || 'Bu kişi';
+        if (!confirm('"' + ad + '" eğitim listesinden silinsin mi? Eğitim kaydı ve diğer katılımcılar korunur. Geri alınamaz.')) return;
+        var yeni = JSON.parse(JSON.stringify(kayit));
+        yeni.katilimcilar.splice(idx, 1);
+        if (!yeni.katilimcilar.length) yeni.katilimcilar.push({ adSoyad: '', gorev: '' });
+        yeni.guncelleme = new Date().toISOString();
+        var kaydedilecek = JSON.parse(JSON.stringify(yeni)); delete kaydedilecek._id;
+        Store.set('egitimoturum/' + yeni._id, kaydedilecek).then(function () {
+          var i = App.oturumlar.findIndex(function (x) { return x._id === yeni._id; });
+          if (i >= 0) App.oturumlar[i] = yeni;
+          if (App.oturum && App.oturum.id === yeni._id) App.oturum = null;
+          toast('Kayıt silindi', 'ok'); yenile();
+        }).catch(function (e) { toast('Silinemedi: ' + (e && e.message || e), 'err'); });
       });
     });
     $$('[data-gsil]').forEach(function (b) {

@@ -6818,6 +6818,23 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   var SG_SOL = ['Balgamlı Öksürük', 'Nefes Darlığı', 'Göğüs Ağrısı', 'Çarpıntı', 'Sırt Ağrısı', 'İshal ve Kabızlık', 'Eklemlerde Ağrı', 'Diğer', 'Diğer'];
   var SG_SAG = ['Kalp Hastalığı', 'Şeker Hastalığı', 'Böbrek Rahatsızlığı', 'Sarılık', 'Mide ve Oniki Parmak Ülseri', 'İşitme Kaybı', 'Görme Bozukluğu', 'Sinir Sistemi Hastalığı', 'Deri Hastalığı', 'Besin Zehirlenmesi'];
   var SG_FIZIK = [['goz', 'Göz', 2], ['kbb', 'Kulak-Burun-Boğaz', 3], ['deri', 'Deri', 4], ['kv', 'Kardiyovasküler sistem', 5], ['sol', 'Solunum sistemi', 6], ['sin', 'Sindirim sistemi', 7], ['uro', 'Ürogenital sistem', 8], ['kas', 'Kas-iskelet sistemi', 9], ['nor', 'Nörolojik', 10], ['psi', 'Psikiyatrik', 11], ['diger', 'Diğer', 12]];
+  /* Fizik muayene varsayılan bulguları (yeni kayıtta gelir; kullanıcı değiştirebilir) */
+  var SG_FIZIK_VARSAYILAN = {
+    goz: 'Bilateral direkt ve indirekt ışık refleksi pozitif, nistagmus yok',
+    kbb: 'Patolojik bulguya rastlanmadı, LAP yok',
+    deri: 'Cilt turgoru normal, siyanoz, ikter veya solukluk saptanmadı',
+    kv: 'Sinüs ritmi, ek ses üfürüm yok. Periferik nabızlar açık, tabii',
+    sol: 'HİHTSEK , oskültasyon olağan, ral (-) ronküs (-)',
+    sin: 'Batın rahat, yüzeyel veya derin palpasyonda defans,  rebound veya hassasiyet yok',
+    uro: 'KVA hassasiyeti bilateral negatif',
+    kas: 'Ekstremiteler simetrik, ödem veya siyanoz yok, eklem hareket açıklıkları tam',
+    nor: 'Duyu muayenesi simetrik ve tam, kas gücü tam (5/5), kas tonusu normal.  DTR normal',
+    psi: 'Özellik yok'
+  };
+  /* Kanaat 2./3. soru: 'e' = Evet (raporda açıklama yok); 's' = koruyucusuz çalışması sakıncalı. Eski kayıtlardaki 'u' da 's' sayılır. */
+  function sgSakincali(v) { return v === 's' || v === 'u'; }
+  var SG_GURULTU_METIN = 'Gürültülü ortamda uygun kulak koruyucu kullanmadan çalışması sakıncalıdır.';
+  var SG_TOZ_METIN = 'Tozlu ortamda uygun solunum koruması kullanmadan çalışması sakıncalıdır.';
   var SG_LAB = [['kan', 'Kan', 2], ['idrar', 'İdrar', 3], ['radyo', 'Radyolojik analizler', 4], ['odyo', 'Odyometre', 6], ['sft', 'SFT', 7], ['psik', 'Psikolojik testler', 8], ['diger', 'Diğer', 9]];
   var SG_SORULAR = [['hastane', '3. Hastanede yattınız mı?', 'Tanı'], ['ameliyat', '4. Ameliyat oldunuz mu?', 'Tanı'], ['kaza', '5. İş kazası geçirdiniz mi?', 'Ne oldu?'], ['meslek', '6. Meslek hastalığı şüphesiyle tetkik veya muayeneye tabi tutuldunuz mu?', 'Sonuç'], ['malul', '7. Maluliyet aldınız mı?', 'Nedeni ve oranı'], ['tedavi', '8. Şu anda herhangi bir tedavi görüyor musunuz?', 'Nedir?']];
   var SG_AYLAR_YIL = { cok: 1, te: 3, az: 5 };
@@ -6837,8 +6854,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       soy: { anne: { d: 'S', t: '' }, baba: { d: 'S', t: '' }, kardes: { d: 'S', t: '' }, cocuk: { d: 'S', t: '' } },
       an1: SG_SOL.map(function () { return 'h'; }), an2: SG_SAG.map(function () { return 'h'; }), an1d: ['', ''],
       q: { hastane: d(), ameliyat: d(), kaza: d(), meslek: d(), malul: d(), tedavi: d(), sigara: { v: 'h', a: '', b: '', c: '', d: '', e: '' }, alkol: { v: 'h', a: '', b: '', c: '', d: '', e: '' } },
-      fizik: {}, lab: {}, vit: { ta1: '', ta2: '', nb: '', boy: '', kilo: '', vki: '' }, gece: 'e', yuksek: 'e',
-      s: { is: '', elverisli: 'e', gurultu: 'u', toz: 'u', tedavi: { v: 'h', tur: '', pol: '' }, kisit: { v: 'h', t: '' }, dusunce: '' } };
+      fizik: Object.assign({}, SG_FIZIK_VARSAYILAN), lab: {}, vit: { ta1: '', ta2: '', nb: '', boy: '', kilo: '', vki: '' }, gece: 'e', yuksek: 'e',
+      s: { is: '', elverisli: 'e', gurultu: 'e', toz: 'e', tedavi: { v: 'h', tur: '', pol: '' }, kisit: { v: 'h', t: '' }, dusunce: '' } };
   }
   function sgDeger(r) {
     var yil = SG_AYLAR_YIL[sgSinif(r.tehlike)], bitis = sgIsoEkle(r.tarih, yil), bg = bugun();
@@ -6903,7 +6920,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     var fs = $('#sgFirma'); if (fs) fs.addEventListener('change', function () { SG.firma = fs.value; render(); });
     var ar = $('#sgAra'); if (ar) ar.addEventListener('input', function () { SG.ara = ar.value; clearTimeout(SG.t); SG.t = setTimeout(function () { render(); var n = $('#sgAra'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
     $$('[data-sguyari]').forEach(function (b) { b.addEventListener('click', function () { SG.firma = b.getAttribute('data-sguyari'); render(); }); });
-    $$('[data-sgduz]').forEach(function (b) { b.addEventListener('click', function () { var r = bul(b.getAttribute('data-sgduz')); if (!r) return; SG.r = JSON.parse(JSON.stringify(r)); SG.yeni = false; App.route = { ad: 'saglikkayit' }; render(); }); });
+    $$('[data-sgduz]').forEach(function (b) { b.addEventListener('click', function () { var r = bul(b.getAttribute('data-sgduz')); if (!r) return; SG.r = JSON.parse(JSON.stringify(r)); if (SG.r.s) { if (SG.r.s.gurultu === 'u') SG.r.s.gurultu = 's'; if (SG.r.s.toz === 'u') SG.r.s.toz = 's'; } SG.yeni = false; App.route = { ad: 'saglikkayit' }; render(); }); });
     $$('[data-sgac]').forEach(function (b) { b.addEventListener('click', function () { var r = bul(b.getAttribute('data-sgac')); if (r) sgRaporIndir(r, false); }); });
     $$('[data-sgsil]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -6955,8 +6972,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     h += sgKart('7. Çalışma durumu', '<div class="grid2"><div class="field"><label>Gece veya vardiyalı çalışabilir mi?</label>' + sgRad('gece', [['e', 'Evet'], ['h', 'Hayır']]) + '</div><div class="field"><label>Yüksekte çalışabilir mi?</label>' + sgRad('yuksek', [['e', 'Evet'], ['h', 'Hayır']]) + '</div></div>');
     h += sgKart('8. Kanaat ve sonuç', '<div class="field"><label>Çalışanın yapacağı iş *</label><input type="text" data-sg="s.is" value="' + esc(r.s.is) + '" placeholder="Ör. Forklift operatörü"></div>' +
       '<div class="field" style="margin-top:10px"><label>1. Çalışan bu işte bedenen ve ruhen çalışmaya elverişli midir?</label>' + sgRad('s.elverisli', SG_HE) + '</div>' +
-      '<div class="field" style="margin-top:10px"><label>2. Gürültülü ortamda çalışması uygun mudur?</label>' + sgRad('s.gurultu', [['u', 'Gürültülü ortamlarda uygun kulak koruyucu kullanmak şartıyla çalışmaya elverişlidir.'], ['s', 'Gürültülü ortamda çalışması sakıncalıdır.']]) + '</div>' +
-      '<div class="field" style="margin-top:10px"><label>3. Tozlu ortamda çalışabilir mi?</label>' + sgRad('s.toz', [['u', 'Tozlu ortamlarda uygun toz maskesi kullanmak şartıyla çalışmaya elverişlidir.'], ['s', 'Tozlu ortamda çalışması sakıncalıdır.']]) + '</div>' +
+      '<div class="field" style="margin-top:10px"><label>2. Gürültülü ortamda çalışması uygun mudur?</label>' + sgRad('s.gurultu', [['e', 'Evet (raporda açıklama yazılmaz)'], ['s', SG_GURULTU_METIN]]) + '</div>' +
+      '<div class="field" style="margin-top:10px"><label>3. Tozlu ortamda çalışabilir mi?</label>' + sgRad('s.toz', [['e', 'Evet (raporda açıklama yazılmaz)'], ['s', SG_TOZ_METIN]]) + '</div>' +
       '<div class="field" style="margin-top:10px"><label>4. Tedavi gerekiyor mu?</label>' + sgRad('s.tedavi.v', SG_HE) + '<div class="grid2"><input type="text" data-sg="s.tedavi.tur" placeholder="Evet ise — tedavi türü" value="' + esc(r.s.tedavi.tur) + '"><input type="text" data-sg="s.tedavi.pol" placeholder="Evet ise — poliklinik" value="' + esc(r.s.tedavi.pol) + '"></div></div>' +
       '<div class="field" style="margin-top:10px"><label>5. Çalışmasında bir kısıt var mıdır?</label>' + sgRad('s.kisit.v', [['e', '… şartıyla çalışmaya elverişlidir'], ['h', 'Hayır']]) + '<input type="text" data-sg="s.kisit.t" placeholder="Evet ise — şart / kısıt" value="' + esc(r.s.kisit.t) + '"></div>' +
       '<div class="field" style="margin-top:10px"><label>Düşünceler (Kanaat raporu, isteğe bağlı)</label><textarea rows="2" data-sg="s.dusunce">' + esc(r.s.dusunce) + '</textarea></div>');
@@ -7115,8 +7132,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       /* sonuç */
       var ps = foWel(sgH(T[18], 1, 0), 'p'), say = s.tedavi.v === 'e', kis = s.kisit.v === 'e';
       sgMetinDegis(ps[1], /[….]{2,}/, sgTemiz(s.is)); if (s.elverisli === 'h') sgMetinDegis(ps[1], /elverişlidir\./, 'elverişli değildir.');
-      if (s.gurultu === 's') adParaYaz(ps[3], '2. Gürültülü ortamda çalışması sakıncalıdır.');
-      if (s.toz === 's') adParaYaz(ps[5], '3. Tozlu ortamda çalışması sakıncalıdır.');
+      if (sgSakincali(s.gurultu)) adParaYaz(ps[3], '2. ' + SG_GURULTU_METIN); else { adSil(ps[3]); adSil(ps[2]); }
+      if (sgSakincali(s.toz)) adParaYaz(ps[5], '3. ' + SG_TOZ_METIN); else { adSil(ps[5]); adSil(ps[4]); }
       if (say) {
         var tur = sgTemiz(s.tedavi.tur), pol = sgTemiz(s.tedavi.pol).toLocaleLowerCase('tr');
         sgMetinDegis(ps[7], /[….]{2,}\s*Tedavisine/, (tur ? tur + ' ' : '') + 'tedavisine');
@@ -7145,12 +7162,11 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var sart = [], tur = sgTemiz(s.tedavi.tur), pol = sgTemiz(s.tedavi.pol).toLocaleLowerCase('tr');
       if (s.tedavi.v === 'e') sart.push((tur ? tur + ' tedavisine' : 'Tedavisine') + ' uymak ve ' + (pol ? pol + ' ' : '') + 'poliklinik kontrollerine düzenli gitmek');
       if (s.kisit.v === 'e' && sgTemiz(s.kisit.t)) sart.push(sgTemiz(s.kisit.t));
-      if (s.gurultu === 'u') sart.push('gürültülü ortamlarda uygun kulak koruyucu kullanmak'); if (s.toz === 'u') sart.push('tozlu ortamlarda uygun toz maskesi kullanmak');
       var sartMetin = sgTemiz(sart.map(function (x, i) { return i ? x.charAt(0).toLocaleLowerCase('tr') + x.slice(1) : x; }).join(', ').replace(/(^|[^a-zçğıöşüA-ZÇĞİÖŞÜ])gitme(?![a-zçğıöşüA-ZÇĞİÖŞÜ])/g, '$1gitmek'));
       var p2 = foWel(sgH(t6, 1, 1), 'p')[2];
       if (s.elverisli === 'h') adParaYaz(p2, '—'); else if (sart.length) sgMetinDegis(p2, /[….]{2,}/, sartMetin); else adParaYaz(p2, 'Herhangi bir şart aranmaksızın çalışmaya elverişlidir.');
       sgKutuIsaretle(foWel(sgH(t6, 2, 1), 'p')[1], r.yuksek === 'e' ? 0 : 1); sgKutuIsaretle(foWel(sgH(t6, 3, 1), 'p')[1], r.gece === 'e' ? 0 : 1);
-      var dus = []; if (s.gurultu === 's') dus.push('Gürültülü ortamda çalışması sakıncalıdır.'); if (s.toz === 's') dus.push('Tozlu ortamda çalışması sakıncalıdır.'); if (s.dusunce.trim()) dus.push(s.dusunce.trim());
+      var dus = []; if (sgSakincali(s.gurultu)) dus.push('2. ' + SG_GURULTU_METIN); if (sgSakincali(s.toz)) dus.push('3. ' + SG_TOZ_METIN); if (s.dusunce.trim()) dus.push(s.dusunce.trim());
       sgYaz(sgH(T[9], 0, 0), dus.join(' '));
       sgYaz(sgH(T[12], 0, 1), r.hekim || ''); sgMetinDegis(foWel(sgH(T[12], 0, 3), 'p')[0], /[….]{2,}\s*\/\s*[….]{2,}\s*\/\s*20[….]+/, sgSlash(r.tarih));
       foWel(doc, 'highlight').forEach(adSil);

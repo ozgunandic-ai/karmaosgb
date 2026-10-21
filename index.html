@@ -3464,7 +3464,10 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
 
   function oturumFirmalari() {
     return benimFirmalarim().filter(function (f) { return f.uzmanKullanici || f.hekimKullanici; })
-      .slice().sort(function (a, b) { return (a.unvan || '').localeCompare(b.unvan || '', 'tr'); });
+      .slice().sort(function (a, b) {
+        var x = ((a.kisaAd || '').trim() || a.unvan || ''), y = ((b.kisaAd || '').trim() || b.unvan || '');
+        return x.localeCompare(y, 'tr');
+      });
   }
   function oturumFirma(o) { return App.firmalar.find(function (f) { return f._id === o.firmaId; }) || null; }
   function oturumDiger(o) { return o.firmaId === '__diger__'; }

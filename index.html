@@ -1923,7 +1923,13 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     return ghApi('GET', '/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + encYol(p) + '?ref=' + encodeURIComponent(cfg.branch), cfg)
       .then(function (j) {
         if (!j || j.type !== 'file') return null;
-        return { sha: j.sha, veri: JSON.parse(b64Coz(j.content)) };
+        /* GitHub "contents" API'si 1 MB'tan büyük dosyalarda içeriği boş döndürür (örn. yüklenen evrak dosyaları);
+           bu durumda içerik "git blobs" API'siyle (100 MB'a kadar) alınır. */
+        if (j.content && String(j.content).replace(/\s/g, '')) return { sha: j.sha, veri: JSON.parse(b64Coz(j.content)) };
+        return ghApi('GET', '/repos/' + cfg.owner + '/' + cfg.repo + '/git/blobs/' + j.sha, cfg).then(function (b) {
+          if (!b || !b.content) throw new Error('Dosya içeriği okunamadı (' + path + ')');
+          return { sha: j.sha, veri: JSON.parse(b64Coz(b.content)) };
+        });
       })
       .catch(function (e) { if (e.status === 404) return null; throw e; });
   }

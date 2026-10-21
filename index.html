@@ -2597,12 +2597,40 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     });
   }
 
+  var FIRMA_ARA = '';
+  function firmaAraUygula() {
+    var q = trNorm(FIRMA_ARA), sat = $$('tr[data-ara]'), say = 0;
+    sat.forEach(function (tr) {
+      var g = !q || q.split(' ').every(function (w) { return tr.getAttribute('data-ara').indexOf(w) >= 0; });
+      tr.style.display = g ? '' : 'none'; if (g) say++;
+    });
+    var r = $('#firmaAraSonuc'); if (r) r.textContent = q ? (say ? say + ' firma bulundu' : 'Eşleşen firma yok') : '';
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'firmaAra') { FIRMA_ARA = e.target.value; firmaAraUygula(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target && e.target.id === 'firmaAra') { e.preventDefault(); firmaAraUygula(); }
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest('#firmaAraBtn,#firmaAraTemizle') : null; if (!t) return;
+    var i = $('#firmaAra'); if (t.id === 'firmaAraTemizle') { FIRMA_ARA = ''; if (i) i.value = ''; } else if (i) FIRMA_ARA = i.value;
+    firmaAraUygula(); if (i) i.focus();
+  });
   function viewFirmalar() {
     var list = benimFirmalarim().slice().sort(function (a, b) { return (a.unvan || '').localeCompare(b.unvan || '', 'tr'); });
     var h = '<div class="phead"><div><h1>Firmalar</h1>' +
       '<p class="psub">' + list.length + ' kayıtlı işyeri' + (yonetimiMi() ? '' : ' · size atanan') + '. Firma bilgileri tüm belgelere otomatik işlenir.</p></div>' +
       (yonetimiMi() ? '<div class="pact"><button class="btn btn-primary" id="yeniFirma">Yeni firma</button></div>' : '') + '</div>';
 
+    if (list.length) {
+      if (FIRMA_ARA) setTimeout(firmaAraUygula, 0);
+      h += '<div class="card" style="margin-bottom:12px"><div class="card-b" style="display:flex;gap:8px;align-items:center">' +
+        '<input id="firmaAra" type="search" autocomplete="off" placeholder="Firma ara: ünvan, kısaltma, işveren, faaliyet, uzman, hekim…" style="flex:1" value="' + esc(FIRMA_ARA) + '">' +
+        '<button type="button" class="btn btn-primary" id="firmaAraBtn">Ara</button>' +
+        '<button type="button" class="btn btn-ghost" id="firmaAraTemizle">Temizle</button></div>' +
+        '<div class="hint" id="firmaAraSonuc" style="padding:0 16px 12px"></div></div>';
+    }
     if (!list.length) {
       h += '<div class="card"><div class="empty"><h3>' + (yonetimiMi() ? 'Henüz firma eklenmedi' : 'Size atanmış firma yok') + '</h3>' +
         '<p>' + (yonetimiMi() ? 'İlk işyerini ekleyin; ardından yıllık İSG planını oluşturabilirsiniz.' : 'Bir yöneticinin sizi bir firmaya İş Güvenliği Uzmanı veya İşyeri Hekimi olarak ataması gerekiyor.') + '</p>' +
@@ -2614,7 +2642,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '</tr></thead><tbody>' +
       list.map(function (f) {
         var n = App.planlar.filter(function (p) { return p.firmaId === f._id; }).length;
-        return '<tr><td><button class="row-link" data-firma="' + f._id + '" style="background:none;border:none;padding:0;text-align:left">' + esc(f.unvan) + '</button>' +
+        return '<tr data-ara="' + esc(trNorm([f.unvan, f.kisaAd, f.isveren, f.faaliyet, f.uzman, f.hekim, f.tehlike, f.sgk].join(' '))) + '"><td><button class="row-link" data-firma="' + f._id + '" style="background:none;border:none;padding:0;text-align:left">' + esc(f.unvan) + '</button>' +
           (n ? ' <span class="tag">' + n + ' plan</span>' : '') +
           firmaKisaSatir(f) +
           (f.isveren ? '<div style="font-size:12px;color:var(--muted)">İşveren: ' + esc(f.isveren) + '</div>' : '') + '</td>' +
@@ -3098,6 +3126,35 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
      ========================================================================== */
   function ozguVarsayilan(tikli) {
     return TEMEL_KONULAR.ozgu.map(function (ad) { return { ad: ad, dk: '', tikli: tikli, ozel: false }; });
+  }
+  /* Tehlike sınıfına göre 1-3. bölüm varsayılan süreleri (dk) — sıra: TEMEL_KONULAR.genel / saglik / teknik */
+  var TEMEL_SURELER = {
+    'Az Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 10, 10], teknik: [10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 5, 10] },
+    'Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 20, 10], teknik: [25, 20, 20, 30, 30, 10, 10, 10, 10, 40, 10, 10] },
+    'Çok Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 20, 10], teknik: [40, 20, 30, 40, 40, 20, 30, 30, 30, 40, 20, 30] }
+  };
+  function oturumSureleriUygula(o) {
+    var t = TEMEL_SURELER[oturumTehlike(o)] || TEMEL_SURELER['Az Tehlikeli'];
+    ['genel', 'saglik', 'teknik'].forEach(function (b) {
+      (o.konular[b] || []).forEach(function (k, i) { if (t[b][i] !== undefined) k.dk = t[b][i]; });
+    });
+  }
+  /* Aynı firma için en son kaydedilen Temel eğitim kaydının 4. bölümünü (A/B: tikler, süreler, eklenen konular) getirir */
+  var oturumOzguNotu = '';
+  function oturumOzguHatirla(o) {
+    oturumOzguNotu = '';
+    if (!o.firmaId || oturumDiger(o)) return;
+    var son = null;
+    App.oturumlar.forEach(function (x) {
+      if (x._id === o.id || x.firmaId !== o.firmaId || x.egitimTuru === 'diger' || !x.konular || !x.konular.ozguA || !x.konular.ozguB) return;
+      if (!son || String(x.guncelleme || '') > String(son.guncelleme || '')) son = x;
+    });
+    if (!son) return;
+    o.konular.ozguA = JSON.parse(JSON.stringify(son.konular.ozguA));
+    o.konular.ozguB = JSON.parse(JSON.stringify(son.konular.ozguB));
+    if (son.ozguGrup) o.ozguGrup = son.ozguGrup;
+    var d = son.guncelleme ? new Date(son.guncelleme) : null;
+    oturumOzguNotu = 'Bu firma için en son kaydettiğiniz 4. bölüm konuları ve süreleri getirildi' + (d && !isNaN(d) ? ' (' + d.toLocaleDateString('tr-TR') + ')' : '') + '.';
   }
   function oturumKonulariHazirla() {
     function kopya(liste) { return liste.map(function (k) { return { ad: k.ad, dk: k.dk, tikli: true }; }); }
@@ -4104,6 +4161,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       if (!bulunan) { git({ ad: 'oturumlar' }); return; }
       if (!oturumGorunur(bulunan)) { toast('Bu kayda erişiminiz yok', 'err'); git({ ad: 'oturumlar' }); return; }
       App.oturum = o = oturumTamamla(JSON.parse(JSON.stringify(bulunan)));
+      oturumOzguNotu = '';
       App.kirli = false;
     }
     var y = window.scrollY;
@@ -4142,6 +4200,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   function oturumOzguBolumu() {
     var o = App.oturum, g = oturumGrup(o);
     return '<div class="ck-baslik" style="font-size:12.5px;margin-bottom:10px">4. İŞE VE İŞYERİNE ÖZGÜ RİSKLER VE RİSK DEĞERLENDİRMESİNE DAYALI KONULAR</div>' +
+      (oturumOzguNotu ? '<p class="hint" style="margin:0 0 10px">' + esc(oturumOzguNotu) + ' Değiştirip kaydettiğinizde bir sonraki kayıtta bu hali gelir.</p>' : '') +
       oturumOzguListesi('ozguA', 'A) (TEHLİKELİ VEYA ÇOK TEHLİKELİ SINIF)', g === 'A') +
       oturumOzguListesi('ozguB', 'B) FAALİYETİN GENEL TEHLİKE VE RİSKLERİ (AZ TEHLİKELİ SINIF)', g === 'B') +
       '<div class="ck-toplam" id="ozguToplam"></div>';
@@ -4243,6 +4302,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     $('#o_firma').addEventListener('change', function () {
       o.firmaId = this.value; o.firmaKisaAd = '';
       if (o.firmaId && o.firmaId !== '__diger__') oturumFirmaSecildi(o);
+      oturumSureleriUygula(o);
+      oturumOzguHatirla(o);
       oturumGrupGuncelle(o);
       kirlet(); yeniden();
     });
@@ -4255,7 +4316,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       seg.addEventListener('click', function (e) {
         var b = e.target.closest('button[data-v]'); if (!b) return;
         var alan = seg.getAttribute('data-seg').slice(2); o[alan] = b.getAttribute('data-v');
-        if (alan === 'digerTehlike') oturumGrupGuncelle(o);
+        if (alan === 'digerTehlike') { oturumSureleriUygula(o); oturumGrupGuncelle(o); }
         kirlet(); yeniden();
       });
     });
@@ -7319,7 +7380,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       return;
     }
     var oy = e.target.closest('#oturumYeni');
-    if (oy) { App.oturum = yeniOturum(); git({ ad: 'oturum', id: App.oturum.id }); return; }
+    if (oy) { oturumOzguNotu = ''; App.oturum = yeniOturum(); git({ ad: 'oturum', id: App.oturum.id }); return; }
     var oa = e.target.closest('[data-oturum]');
     if (oa) { App.oturum = null; git({ ad: 'oturum', id: oa.getAttribute('data-oturum') }); return; }
     var os = e.target.closest('[data-oturumsil]');

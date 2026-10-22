@@ -7018,6 +7018,10 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   /* ---- Word: yardımcılar ---- */
   var WPS_NS = 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape';
   function sgH(tbl, r, c) { var tr = adTrler(tbl)[r]; return tr && foHucreler(tr)[c]; }
+  /* Her kelimenin baş harfi büyük, diğerleri küçük (Türkçe i/İ, ı/I kurallarıyla): "FORKLİFT operatörü" -> "Forklift Operatörü" */
+  function sgBasHarf(x) {
+    return String(x || '').replace(/\S+/g, function (w) { return w.charAt(0).toLocaleUpperCase('tr') + w.slice(1).toLocaleLowerCase('tr'); });
+  }
   function sgTemiz(x) { return String(x || '').trim().replace(/[\s….]+$/, ''); }
   function sgKolBas(tc) {
     var k = 0;
@@ -7156,7 +7160,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       sgTik(sgH(T[16], 0, r.gece === 'e' ? 1 : 2), 0); sgTik(sgH(T[16], 1, r.yuksek === 'e' ? 1 : 2), 0);
       /* sonuç */
       var ps = foWel(sgH(T[18], 1, 0), 'p'), say = s.tedavi.v === 'e', kis = s.kisit.v === 'e';
-      sgMetinDegis(ps[1], /[….]{2,}/, sgTemiz(s.is)); if (s.elverisli === 'h') sgMetinDegis(ps[1], /elverişlidir\./, 'elverişli değildir.');
+      sgMetinDegis(ps[1], /[….]{2,}/, sgBasHarf(sgTemiz(s.is))); if (s.elverisli === 'h') sgMetinDegis(ps[1], /elverişlidir\./, 'elverişli değildir.');
       if (sgSakincali(s.gurultu)) adParaYaz(ps[3], '2. ' + SG_GURULTU_METIN); else { adSil(ps[3]); adSil(ps[2]); }
       if (sgSakincali(s.toz)) adParaYaz(ps[5], '3. ' + SG_TOZ_METIN); else { adSil(ps[5]); adSil(ps[4]); }
       if (say) {
@@ -7181,10 +7185,10 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var B = adAc(dosyalar), doc = B.doc, T = B.bl, logo = F.logo && F.logo.veri ? F.logo : null;
       var tcL = foLogoAday(doc, false);
       if (logo && foLogoKoy(doc, { logo: logo }, false)) egLogoPaketle(dosyalar, logo); else if (tcL) adHucreYaz(tcL, F.unvan);
-      sgYaz(sgH(T[3], 0, 1), F.unvan); sgYaz(sgH(T[3], 1, 1), c.adSoyad); sgYaz(sgH(T[3], 1, 3), c.sgkNo); sgYaz(sgH(T[3], 2, 1), c.meslek); sgYaz(sgH(T[3], 2, 3), c.yapilanIs || s.is);
+      sgYaz(sgH(T[3], 0, 1), F.unvan); sgYaz(sgH(T[3], 1, 1), c.adSoyad); sgYaz(sgH(T[3], 1, 3), c.sgkNo); sgYaz(sgH(T[3], 2, 1), c.meslek); sgYaz(sgH(T[3], 2, 3), c.yapilanIs || sgBasHarf(s.is));
       sgYaz(sgH(T[3], 3, 1), c.bolum); sgKutuIsaretle(foWel(sgH(T[3], 4, 1), 'p')[0], r.tur === 'periyodik' ? 1 : 0);
       var t6 = T[6], p1 = foWel(sgH(t6, 0, 1), 'p')[2];
-      sgMetinDegis(p1, /[….]{2,}/, sgTemiz(s.is)); if (s.elverisli === 'h') sgMetinDegis(p1, /elverişlidir\./, 'elverişli değildir.');
+      sgMetinDegis(p1, /[….]{2,}/, sgBasHarf(sgTemiz(s.is))); if (s.elverisli === 'h') sgMetinDegis(p1, /elverişlidir\./, 'elverişli değildir.');
       var sart = [], tur = sgTemiz(s.tedavi.tur), pol = sgTemiz(s.tedavi.pol).toLocaleLowerCase('tr');
       if (s.tedavi.v === 'e') sart.push((tur ? tur + ' tedavisine' : 'Tedavisine') + ' uymak ve ' + (pol ? pol + ' ' : '') + 'poliklinik kontrollerine düzenli gitmek');
       if (s.kisit.v === 'e' && sgTemiz(s.kisit.t)) sart.push(sgTemiz(s.kisit.t));

@@ -7049,6 +7049,31 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     if (rp) run.appendChild(rp.cloneNode(true));
     t.setAttributeNS(XML, 'xml:space', 'preserve'); t.textContent = v; run.appendChild(t); p.appendChild(run);
   }
+  /* Fizik muayene / laboratuvar sonuç hücreleri dardır; uzun metin satırları çoğaltıp raporu 3. sayfaya taşırdı.
+     Yazı, hücreye sığacak en büyük boyuta (en fazla 10 pt, en az 7 pt) küçültülür. gen: hücre genişliği (pt) */
+  function sgSigdir(tc, v, gen) {
+    if (!tc || !v) return;
+    var n = String(v).length, h = 20, k;
+    for (k = 20; k >= 14; k -= 2) { h = k; if (n * 0.5 * (k / 2) <= gen) break; }
+    var p = foWel(sgBirlesik(tc), 'p')[0]; if (!p) return;
+    foWel(p, 'r').forEach(function (r) {
+      var rp = foCocuk(r, 'rPr'); if (!rp) return;
+      ['sz', 'szCs'].forEach(function (a) { var e = foCocuk(rp, a); if (e) e.setAttributeNS(WNS, 'w:val', String(h)); });
+    });
+  }
+  /* Son tablodan sonra gelen boş paragraf, sayfa dolunca fazladan (boş) bir sayfa açıyordu: en aza indirilir */
+  function sgSonParagrafKucult(B) {
+    for (var i = B.bl.length - 1; i >= 0; i--) {
+      var n = B.bl[i]; if (n.localName === 'sectPr') continue;
+      if (n.localName !== 'p' || foMetin(n).trim()) return;
+      var d = n.ownerDocument, ppr = foCocuk(n, 'pPr');
+      if (!ppr) { ppr = d.createElementNS(WNS, 'w:pPr'); n.insertBefore(ppr, n.firstChild); }
+      Array.prototype.slice.call(ppr.childNodes).forEach(adSil);
+      var x = new DOMParser().parseFromString('<w:pPr xmlns:w="' + WNS + '"><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/><w:szCs w:val="2"/></w:rPr></w:pPr>', 'application/xml').documentElement;
+      Array.prototype.slice.call(x.childNodes).forEach(function (c) { ppr.appendChild(d.importNode(c, true)); });
+      return;
+    }
+  }
   function sgEkle(tc, v) {
     if (!tc || !v) return;
     var ts = foWel(tc, 't'), t = ts[ts.length - 1];
@@ -7121,8 +7146,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       if (sg.v === 'h') sgTik(sgH(t12, 5, 1), 0); else if (sg.v === 'b') { sgTik(sgH(t12, 7, 2), 0); sgYaz(sgH(t12, 6, 3), sg.a); sgYaz(sgH(t12, 6, 4), sg.b); sgYaz(sgH(t12, 6, 5), sg.c); } else { sgTik(sgH(t12, 9, 1), 0); sgYaz(sgH(t12, 8, 3), sg.d); sgYaz(sgH(t12, 8, 4), sg.e); }
       if (al.v === 'h') sgTik(sgH(t12, 11, 2), 0); else if (al.v === 'b') { sgTik(sgH(t12, 13, 2), 0); sgYaz(sgH(t12, 12, 3), al.a); sgYaz(sgH(t12, 12, 4), al.b); sgYaz(sgH(t12, 12, 5), al.c); } else { sgTik(sgH(t12, 15, 2), 0); sgYaz(sgH(t12, 14, 3), al.d); sgYaz(sgH(t12, 14, 4), al.e); }
       /* fizik muayene / laboratuvar */
-      SG_FIZIK.forEach(function (x) { sgYaz(sgH(T[14], x[2], 1), (r.fizik[x[0]] || '').trim()); });
-      SG_LAB.forEach(function (x) { sgYaz(sgH(T[14], x[2], 3), (r.lab[x[0]] || '').trim()); });
+      SG_FIZIK.forEach(function (x) { var v = (r.fizik[x[0]] || '').trim(); sgYaz(sgH(T[14], x[2], 1), v); sgSigdir(sgH(T[14], x[2], 1), v, 150); });
+      SG_LAB.forEach(function (x) { var v = (r.lab[x[0]] || '').trim(); sgYaz(sgH(T[14], x[2], 3), v); sgSigdir(sgH(T[14], x[2], 3), v, 145); });
       var v = r.vit, vki = v.vki || (v.boy && v.kilo ? (+String(v.kilo).replace(',', '.') / Math.pow(+String(v.boy).replace(',', '.') / 100, 2)).toFixed(1).replace('.', ',') : '');
       var vp = foWel(sgH(T[14], 10, 2), 'p');
       if (v.ta1 || v.ta2) adParaYaz(vp[1], 'TA:    ' + (v.ta1 || '…') + ' / ' + (v.ta2 || '…') + ' mm Hg');
@@ -7144,6 +7169,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       sgEkle(sgH(t18, 2, 0), ''); foYerles(p2, foMetin(p2).length, foMetin(p2).length, ' ' + (r.hekim || ''));
       sgMetinDegis(foWel(sgH(t18, 2, 1), 'p')[3], /[….]{2,}\s*\/\s*[….]{2,}\s*\/\s*[….]{2,}/, sgSlash(r.tarih));
       foWel(doc, 'highlight').forEach(adSil);
+      sgSonParagrafKucult(B);
       B.part.data = egSerialize(doc);
       return window.KarmaGen.zipStore(dosyalar);
     });

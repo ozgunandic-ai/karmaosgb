@@ -2444,7 +2444,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     ];
     if (sgErisim()) nav.push({ ad: 'saglik', l: 'Sağlık Gözetimi', i: ICON.kayit });
     nav.push(
-      { ad: 'risk', l: 'Risk Değerlendirme', i: ICON.plan, ext: 'risk' },
+      { ad: 'risk', l: 'Risk Değerlendirme', i: ICON.plan, href: 'risk/index.html', alt: true },
       { ad: 'tehlike', l: 'Tehlike Avcısı', i: ICON.tehlike },
       { ad: 'thliste', l: 'İSG Faaliyet Kontrol Listesi', i: ICON.thliste },
       { ad: 'formolusturucu', l: 'Form Oluşturucu', i: ICON.form },
@@ -2471,7 +2471,6 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '<div class="body">' +
       '<nav class="nav" id="nav">' +
       nav.map(function (n) {
-        if (n.ext) return '<a href="#" data-ext="' + n.ext + '">' + n.i + '<span>' + n.l + '</span></a>';   // durum çubuğunda adres görünmez; aynı sekmede açılır
         if (n.href) return '<a href="' + n.href + '" class="nav-alt">' + n.i + '<span>' + n.l + '</span></a>';   // ayrı sayfaya yönlendirir
         return '<a href="#" data-nav="' + n.ad + '" class="' + (App.route.ad === n.ad ? 'on' : '') + '">' + n.i + '<span>' + n.l + '</span></a>';
       }).join('') +
@@ -2485,8 +2484,6 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       App.kullanici = null; App.plan = null; App.egitim = null; App.oturum = null; App.saglik = undefined; renderGiris();
     });
     $('#burger').addEventListener('click', function () { $('#nav').classList.toggle('open'); });
-    var DIS_LINK = { risk: 'https://ozgunandic-ai.github.io/karmarad/' };
-    $$('[data-ext]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); var u = DIS_LINK[a.getAttribute('data-ext')]; if (u) window.location.href = u; }); });
     $$('[data-nav]').forEach(function (a) {
       a.addEventListener('click', function (e) {
         e.preventDefault();

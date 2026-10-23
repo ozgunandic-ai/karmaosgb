@@ -2073,6 +2073,119 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     }
   };
 
+
+  /* ==========================================================================
+     SON İŞLEMLER — hangi kullanıcı, neyi, ne zaman yaptı (yalnızca yönetici görür)
+     Kayıt/silme işlemleri Store üzerinden otomatik yakalanır; aylık dosyalarda saklanır: islemlog/YYYY-AA
+     ========================================================================== */
+  var LOG_TUR = {
+    firmalar: 'Firma', planlar: 'Yıllık İSG planı', egitimplani: 'Yıllık eğitim planı', egitimoturum: 'Eğitim kaydı', egitimgecmis: 'Önceki eğitim kaydı',
+    kutuphane: 'Kütüphane belgesi', evrak: 'Firma evrakı', tehlike: 'Tehlike Avcısı analizi', saglik: 'Sağlık kaydı', users: 'Kullanıcı',
+    ziyaret: 'Ziyaret takvimi', app: 'Uygulama ayarı', oturum: 'Oturum'
+  };
+  var LOG_ATLA = /^(islemlog|_saglik)(\/|$)|_(dosya|pdf|foto)\//;   // dosya içerikleri ayrıca yazılmaz; kayıtları zaten günlüğe düşer
+  var LOG = { bekleyen: [], calisiyor: false };
+  function logAy(iso) { return String(iso).slice(0, 7); }
+  function logBul(liste, id) { return (liste || []).find(function (x) { return x._id === id || x.id === id; }) || null; }
+  function logFirmaAdi(id) { var f = logBul(App.firmalar, id); return f ? firmaKisa(f) : ''; }
+  function logKayit(koll, id) {
+    var L = { firmalar: App.firmalar, planlar: App.planlar, egitimplani: App.egitimPlanlari, egitimoturum: App.oturumlar, egitimgecmis: App.gecmis, kutuphane: App.kutuphane, evrak: App.evrak, tehlike: App.tehlike, saglik: App.saglik, users: App.kullanicilar }[koll];
+    return logBul(L, id);
+  }
+  function logAyrinti(yol, veri) {
+    try {
+      var p = yol.split('/'), koll = p[0], id = p[1];
+      if (koll === 'ziyaret') return (p[1] || '') + ' · ' + (p[2] || '');
+      var k = veri || logKayit(koll, id); if (!k) return '';
+      var bol = function (a) { return a.filter(Boolean).join(' · '); };
+      if (koll === 'firmalar') return k.unvan || '';
+      if (koll === 'planlar' || koll === 'egitimplani') return bol([logFirmaAdi(k.firmaId), k.yil]);
+      if (koll === 'egitimoturum') return bol([k.firmaId === '__diger__' ? k.digerFirmaAdi : logFirmaAdi(k.firmaId), k.egitimTuru === 'diger' ? k.digerEgitimAdi : 'Temel İSG eğitimi', (k.katilimcilar || []).filter(function (x) { return x.adSoyad; }).length + ' kişi']);
+      if (koll === 'egitimgecmis') return (k.satirlar || []).length + ' kişi';
+      if (koll === 'saglik') return bol([k.c && k.c.adSoyad, k.firmaId && k.firmaId !== 'diger' ? logFirmaAdi(k.firmaId) : k.firmaAdi]);
+      if (koll === 'evrak') return bol([k.ad, logFirmaAdi(k.firmaId)]);
+      if (koll === 'kutuphane') return k.ad || k.baslik || k.dosyaAdi || '';
+      if (koll === 'users') return k.adSoyad || k.kullanici || '';
+      if (koll === 'tehlike') return bol([logFirmaAdi(k.firmaId), k.faaliyet || k.ad]);
+    } catch (e) { }
+    return '';
+  }
+  function islemKaydet(islem, yol, veri, onceVar) {
+    try {
+      if (!App.kullanici || LOG_ATLA.test(yol)) return;
+      var koll = yol.split('/')[0];
+      LOG.bekleyen.push({ t: new Date().toISOString(), k: App.kullanici.kullanici, a: App.kullanici.adSoyad || App.kullanici.kullanici, i: islem, tur: LOG_TUR[koll] || koll, d: logAyrinti(yol, veri) });
+      logAkit();
+    } catch (e) { }
+  }
+  function logAkit() {
+    if (LOG.calisiyor || !LOG.bekleyen.length) return;
+    LOG.calisiyor = true;
+    var grup = LOG.bekleyen.splice(0), aylar = {};
+    grup.forEach(function (e) { (aylar[logAy(e.t)] = aylar[logAy(e.t)] || []).push(e); });
+    Object.keys(aylar).reduce(function (z, ay) {
+      return z.then(function () {
+        return StoreGet('islemlog/' + ay).then(function (d) {
+          d = d || { kayitlar: [] }; d.kayitlar = (d.kayitlar || []).concat(aylar[ay]);
+          return StoreSet('islemlog/' + ay, d);
+        });
+      });
+    }, Promise.resolve()).catch(function () { /* günlük yazılamazsa asıl işlem etkilenmesin */ }).then(function () { LOG.calisiyor = false; logAkit(); });
+  }
+  var StoreGet = function (p) { return Store.get(p); }, StoreSet;
+  (function () {
+    var _set = Store.set, _del = Store.del;
+    StoreSet = function (p, d) { return _set.call(Store, p, d); };
+    Store.set = function (path, data) {
+      var koll = String(path).split('/')[0], onceki = !LOG_ATLA.test(path) && ['firmalar', 'planlar', 'egitimplani', 'egitimoturum', 'egitimgecmis', 'kutuphane', 'evrak', 'tehlike', 'saglik', 'users'].indexOf(koll) >= 0 ? !!logKayit(koll, String(path).split('/')[1]) : null;
+      return _set.call(Store, path, data).then(function (r) { islemKaydet(onceki === null ? 'Kaydetti' : onceki ? 'Güncelledi' : 'Ekledi', path, data); return r; });
+    };
+    Store.del = function (path) {
+      var ayr = LOG_ATLA.test(path) ? '' : logAyrinti(String(path), null);
+      return _del.call(Store, path).then(function (r) { islemKaydet('Sildi', path, null); if (ayr && LOG.bekleyen.length) { var son = LOG.bekleyen[LOG.bekleyen.length - 1]; if (son && !son.d) son.d = ayr; } return r; });
+    };
+  })();
+
+  /* ---- görünüm (yalnızca yönetici) ---- */
+  var SON = { aylar: 2, yuklu: null, kul: '', ara: '', yukleniyor: false };
+  function sonIslemYukle(adet) {
+    var simdi = new Date(), liste = [], i;
+    for (i = 0; i < adet; i++) { var d = new Date(simdi.getFullYear(), simdi.getMonth() - i, 1); liste.push(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2)); }
+    SON.yukleniyor = true;
+    return Promise.all(liste.map(function (ay) { return StoreGet('islemlog/' + ay).then(function (d) { return d && d.kayitlar || []; }).catch(function () { return []; }); })).then(function (p) {
+      SON.yuklu = [].concat.apply([], p).sort(function (a, b) { return String(b.t).localeCompare(String(a.t)); }); SON.yukleniyor = false;
+    });
+  }
+  function viewSonIslem() {
+    if (!yonetimiMi()) return '<div class="card"><div class="empty"><h3>Bu bölüme yalnızca yönetici erişebilir</h3></div></div>';
+    if (SON.yuklu === null && !SON.yukleniyor) sonIslemYukle(SON.aylar).then(function () { if (App.route.ad === 'sonislem') render(); });
+    var h = '<div class="phead"><div><h1>Son işlemler</h1><p class="psub">Hangi kullanıcı hangi işlemi ne zaman yaptı. En yeni işlem en üstte; yalnızca yönetici görür.</p></div>' +
+      '<div class="pact"><button class="btn btn-ghost" id="sonYenile">Yenile</button></div></div>';
+    if (SON.yuklu === null) return h + '<div class="card"><div class="empty"><h3>Yükleniyor…</h3></div></div>';
+    var kul = {}; SON.yuklu.forEach(function (e) { kul[e.k] = e.a || e.k; });
+    var q = trNorm(SON.ara);
+    var l = SON.yuklu.filter(function (e) { return (!SON.kul || e.k === SON.kul) && (!q || trNorm([e.a, e.i, e.tur, e.d].join(' ')).indexOf(q) >= 0); });
+    h += '<div class="lst-filtre"><div class="field"><label for="sonKul">Kullanıcı</label><select id="sonKul"><option value="">Tüm kullanıcılar</option>' +
+      Object.keys(kul).sort(function (a, b) { return kul[a].localeCompare(kul[b], 'tr'); }).map(function (k) { return '<option value="' + esc(k) + '"' + (SON.kul === k ? ' selected' : '') + '>' + esc(kul[k]) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="sonAra">Ara</label><input id="sonAra" type="text" placeholder="İşlem, kayıt veya firma…" value="' + esc(SON.ara) + '"></div><div class="lst-ozet">' + l.length + ' işlem</div></div>';
+    var sinir = 500;
+    h += l.length ? '<div class="card"><div class="card-b tight"><table class="tbl"><thead><tr><th>Tarih ve saat</th><th>Kullanıcı</th><th>İşlem</th><th>Kayıt türü</th><th class="opt">Ayrıntı</th></tr></thead><tbody>' +
+      l.slice(0, sinir).map(function (e) {
+        var d = new Date(e.t), tz = isNaN(d) ? e.t : d.toLocaleDateString('tr-TR') + ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return '<tr><td style="white-space:nowrap">' + esc(tz) + '</td><td><strong>' + esc(e.a || e.k) + '</strong></td><td>' + esc(e.i) + '</td><td>' + esc(e.tur) + '</td><td class="opt">' + esc(e.d || '') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>' + (l.length > sinir ? '<p class="hint">İlk ' + sinir + ' işlem gösteriliyor; aramayı daraltın.</p>' : '')
+      : '<div class="card"><div class="empty"><h3>Kayıt yok</h3><p>' + (SON.yuklu.length ? 'Filtreyle eşleşen işlem bulunamadı.' : 'İşlem günlüğü bu sürümle birlikte başlar; bundan sonraki işlemler burada listelenir.') + '</p></div></div>';
+    h += '<p style="margin-top:8px"><button class="btn btn-ghost btn-sm" id="sonEski">Daha eski kayıtları yükle (' + SON.aylar + ' aydan önce)</button></p>';
+    return h;
+  }
+  function bindSonIslem() {
+    if (!yonetimiMi()) return;
+    var b = $('#sonYenile'); if (b) b.addEventListener('click', function () { SON.yuklu = null; render(); });
+    var k = $('#sonKul'); if (k) k.addEventListener('change', function () { SON.kul = k.value; render(); });
+    var a = $('#sonAra'); if (a) a.addEventListener('input', function () { SON.ara = a.value; clearTimeout(SON.t); SON.t = setTimeout(function () { render(); var n = $('#sonAra'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
+    var e = $('#sonEski'); if (e) e.addEventListener('click', function () { SON.aylar += 3; SON.yuklu = null; render(); });
+  }
+
   /* ---------------- faaliyet kataloğu ---------------- */
   // tip: 'kurul_olusturma' | 'kurul_egitim' | 'kurul_toplanti' | 'atama' | 'mevzuat' | 'periyodik'
   var UZMAN_UNVANLARI = ['A Sınıfı İş Güvenliği Uzmanı', 'B Sınıfı İş Güvenliği Uzmanı', 'C Sınıfı İş Güvenliği Uzmanı', 'İşyeri Hekimi'];
@@ -2404,6 +2517,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       }).then(function (u) {
         App.kullanici = u;
         try { sessionStorage.setItem('karma_osgb_oturum', ku); } catch (x) { }
+        islemKaydet('Giriş yaptı', 'oturum/giris', null);
         yukleVeAc();
       }).catch(function (err) {
         $('#g_go').disabled = false;
@@ -2454,7 +2568,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       { ad: 'tahliye', l: 'Tahliye Planı', i: ICON.form, href: 'tahliye-plani.html', alt: true },
       { ad: 'kutuphane', l: 'Kütüphane', i: ICON.kutuphane }
     );
-    if (yon) nav.push({ ad: 'kullanicilar', l: 'Kullanıcılar', i: ICON.users });
+    if (yon) nav.push({ ad: 'sonislem', l: 'Son İşlemler', i: ICON.thliste }, { ad: 'kullanicilar', l: 'Kullanıcılar', i: ICON.users });
     nav.push({ ad: 'ayarlar', l: 'Ayarlar', i: ICON.gear });
 
     document.body.innerHTML =
@@ -2515,6 +2629,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     if (r.ad === 'acildurum') return renderKabuk(viewAcilDurum()), bindAcilDurum();
     if (r.ad === 'formolusturucu') return renderKabuk(viewFormOlusturucu()), bindFormOlusturucu();
     if (r.ad === 'evrak') return renderKabuk(viewEvrakTakip()), bindEvrakTakip();
+    if (r.ad === 'sonislem') return renderKabuk(viewSonIslem()), bindSonIslem();
     if (r.ad === 'kullanicilar') return renderKabuk(viewKullanicilar()), bindKullanicilar();
     if (r.ad === 'ayarlar') return renderKabuk(viewAyarlar()), bindAyarlar();
     renderKabuk(viewFirmalar());
@@ -3335,12 +3450,23 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var t6 = adTrler(bl[6]); adParaYaz(foWel(t6[0], 'p')[0], egUpper(ad));
       var yari = Math.ceil(konu.length / 2), kt = foHucreler(t6[1]);
       egKutuDoldur(kt[0], konu.slice(0, yari)); egKutuDoldur(kt[1], konu.slice(yari));
-      var t9 = adTrler(bl[9]), kat = oturumKatilimcilari(o);
-      kat.forEach(function (k, i) {
-        var tr = t9[i + 1];
-        if (!tr) { tr = t9[t9.length - 1].cloneNode(true); bl[9].appendChild(tr); t9.push(tr); adHucreYaz(foHucreler(tr)[0], String(i + 1)); }
-        var h = foHucreler(tr);
-        foHucreYaz(h[1], k.adSoyad, h[0]); foHucreYaz(h[2], kisa + (k.gorev ? ' - ' + k.gorev : ''), h[0]);
+      /* katılımcılar: her formda şablondaki satır sayısı kadar kişi; fazlası için formun tamamı yeni sayfada tekrarlanır ve numaralar kaldığı yerden devam eder */
+      var t9 = adTrler(bl[9]), kat = oturumKatilimcilari(o), kap = t9.length - 1, sayfa = Math.max(1, Math.ceil(kat.length / kap)), tablolar = [bl[9]];
+      var son = bl[10];
+      if (son && son.localName === 'p') { while (son.firstChild) son.removeChild(son.firstChild); son.appendChild(doc.importNode(new DOMParser().parseFromString('<w:pPr xmlns:w="' + WNS + '"><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>', 'application/xml').documentElement, true)); }
+      if (sayfa > 1) {
+        var sect = bl[bl.length - 1], govde = sect.parentNode, ilk = bl.slice(0, 11);
+        for (var sy = 1; sy < sayfa; sy++) {
+          govde.insertBefore(doc.importNode(new DOMParser().parseFromString('<w:p xmlns:w="' + WNS + '"><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>', 'application/xml').documentElement, true), sect);
+          ilk.forEach(function (e, idx) { var c = e.cloneNode(true); egKimlikYenile(c); govde.insertBefore(c, sect); if (idx === 9) tablolar.push(c); });
+        }
+      }
+      tablolar.forEach(function (tbl, sy) {
+        adTrler(tbl).slice(1).forEach(function (tr, i) {
+          var h = foHucreler(tr), k = kat[sy * kap + i];
+          adHucreYaz(h[0], String(sy * kap + i + 1));
+          if (k) { foHucreYaz(h[1], k.adSoyad, h[0]); foHucreYaz(h[2], kisa + (k.gorev ? ' - ' + k.gorev : ''), h[0]); }
+        });
       });
       foWel(doc, 'highlight').forEach(adSil);
       B.part.data = egSerialize(doc);
@@ -4305,7 +4431,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     }
 
     // 5) Katılımcılar
-    h += '<div class="card"><div class="card-h"><h2>' + (temel ? '5' : '4') + '. Eğitim alacak kişiler</h2><span class="ch-sub">17 kişiden sonrası yeni tutanak sayfasına geçer</span></div><div class="card-b">' +
+    h += '<div class="card"><div class="card-h"><h2>' + (temel ? '5' : '4') + '. Eğitim alacak kişiler</h2><span class="ch-sub">' + (temel ? 15 : 18) + ' kişiden sonrası için tutanak aynı biçimde ikinci kez oluşturulur; numaralar kaldığı yerden devam eder</span></div><div class="card-b">' +
       o.katilimcilar.map(function (k, i) {
         return '<div class="memberrow"><span class="hint" style="min-width:26px">' + (i + 1) + '.</span>' +
           '<input type="text" data-k="' + i + ':adSoyad" value="' + esc(k.adSoyad) + '" placeholder="Adı soyadı" style="flex:0 0 40%">' +
@@ -4314,7 +4440,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
           '<button class="btn btn-quiet" data-ksil="' + i + '" aria-label="Sil">✕</button></div>';
       }).join('') +
       '<div class="gtools"><button class="btn btn-ghost btn-sm" id="kEkle">+ Kişi ekle</button> <span class="gcount">' +
-      o.katilimcilar.filter(function (k) { return k.adSoyad; }).length + ' kişi · ' + Math.max(1, Math.ceil(o.katilimcilar.length / 17)) + ' tutanak sayfası</span></div>' +
+      o.katilimcilar.filter(function (k) { return k.adSoyad; }).length + ' kişi · ' + Math.max(1, Math.ceil(o.katilimcilar.length / (temel ? 15 : 18))) + ' tutanak sayfası</span></div>' +
       (true ? '<p class="hint" style="margin-top:8px">“Eğitim Belgesi Bas”: her katılımcı için ayrı, 2 sayfalık (belge + eğitim konuları) Word dosyası hazırlanır; birden çok kişi varsa dosyalar tek bir ZIP içinde iner. Satırdaki “Belge” düğmesi yalnızca o kişi içindir.</p>' : '') + '</div></div>';
 
     h += '<div class="savebar"><span class="sb-info" id="oSbInfo">Tüm değişiklikler kaydedilmeye hazır</span><span class="sb-space"></span>' +
@@ -5780,6 +5906,30 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     gun[zaman] = gun[zaman].filter(function (x) { return x.id !== girisId; });
   }
 
+  /* aynı tekrar kuralıyla (tekrarId) eklenmiş tüm ziyaretler */
+  function ziyaretSeri(tekrarId) {
+    var out = [];
+    Object.keys(App.ziyaret.gunler).forEach(function (t) {
+      var g = App.ziyaret.gunler[t];
+      Object.keys(g).forEach(function (z) { (g[z] || []).forEach(function (x) { if (x.tekrarId === tekrarId) out.push({ tarih: t, zaman: z, id: x.id, durum: x.durum }); }); });
+    });
+    return out;
+  }
+  /* tarihtenISO verilirse yalnızca o tarih ve sonrası silinir; koru: durumu işaretlenmiş ziyaretler kalır */
+  function ziyaretSeriSil(tekrarId, tarihtenISO, koru) {
+    var say = 0;
+    Object.keys(App.ziyaret.gunler).forEach(function (t) {
+      if (tarihtenISO && t < tarihtenISO) return;
+      var g = App.ziyaret.gunler[t];
+      Object.keys(g).forEach(function (z) {
+        var once = (g[z] || []).length;
+        g[z] = (g[z] || []).filter(function (x) { return !(x.tekrarId === tekrarId && !(koru && x.durum)); });
+        say += once - g[z].length;
+      });
+    });
+    return say;
+  }
+
   function ziyaretDurumDegistir(tarihISO, zaman, girisId, yeniDurum) {
     var gun = App.ziyaret.gunler[tarihISO];
     if (!gun) return;
@@ -6042,10 +6192,35 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     $$('[data-zsil]').forEach(function (b) {
       b.addEventListener('click', function () {
         var parca = b.getAttribute('data-zsil').split(':');
-        if (!confirm('Bu ziyaret kaldırılsın mı?')) return;
-        ziyaretSil(parca[0], parca[1], parca[2]);
-        ziyaretKaydet().then(function () { renderZiyaret(); })
-          .catch(function (e) { toast('Kaydedilemedi: ' + (e && e.message || e), 'err'); });
+        var kaydet = function () {
+          return ziyaretKaydet().then(function () { renderZiyaret(); })
+            .catch(function (e) { toast('Kaydedilemedi: ' + (e && e.message || e), 'err'); });
+        };
+        var gunKayit = App.ziyaret.gunler[parca[0]], giris = gunKayit && (gunKayit[parca[1]] || []).find(function (x) { return x.id === parca[2]; });
+        var seri = giris && giris.tekrarId ? ziyaretSeri(giris.tekrarId) : [];
+        if (seri.length < 2) {
+          if (!confirm('Bu ziyaret kaldırılsın mı?')) return;
+          ziyaretSil(parca[0], parca[1], parca[2]); kaydet(); return;
+        }
+        var sonrakiSayi = seri.filter(function (x) { return x.tarih >= parca[0]; }).length;
+        modal({
+          baslik: 'Tekrarlayan ziyareti kaldır',
+          govde: '<p class="hint" style="margin-top:0">Bu ziyaret “' + esc(ziyaretTekrarAdi(giris.tekrar)) + '” sıklıkla eklenmiş (bu takvimde toplam ' + seri.length + ' ziyaret).</p>' +
+            '<label class="chk"><input type="radio" name="zsilkapsam" value="bu" checked> Yalnızca bu ziyaret</label>' +
+            '<label class="chk"><input type="radio" name="zsilkapsam" value="sonraki"> Bu ve sonraki ziyaretler (' + sonrakiSayi + ')</label>' +
+            '<label class="chk"><input type="radio" name="zsilkapsam" value="tum"> Serinin tamamı (' + seri.length + ')</label>' +
+            '<label class="chk" style="margin-top:10px"><input type="checkbox" id="zsilKoru" checked> “Gerçekleşti / gerçekleşmedi” işaretlenmiş ziyaretleri koru</label>',
+          onay: 'Kaldır',
+          kaydet: function (kapat) {
+            var kapsam = ($('input[name="zsilkapsam"]:checked') || {}).value || 'bu', koru = $('#zsilKoru').checked;
+            if (kapsam === 'bu') ziyaretSil(parca[0], parca[1], parca[2]);
+            else {
+              var n = ziyaretSeriSil(giris.tekrarId, kapsam === 'sonraki' ? parca[0] : '', koru);
+              toast(n + ' ziyaret kaldırıldı', 'ok');
+            }
+            kapat(); kaydet();
+          }
+        });
       });
     });
   }
@@ -6828,6 +7003,14 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     nor: 'Duyu muayenesi simetrik ve tam, kas gücü tam (5/5), kas tonusu normal.  DTR normal',
     psi: 'Özellik yok'
   };
+  /* Laboratuvar bulguları varsayılanları (yeni kayıtta gelir; kullanıcı değiştirebilir) */
+  var SG_LAB_VARSAYILAN = {
+    kan: 'Hemogram: Normal / HBA1C: Normal',
+    radyo: 'PA Akciğer grafisi normal',
+    odyo: 'Normal',
+    sft: 'Normal',
+    diger: 'Gözlükle sağlam, EKG normal'
+  };
   /* Kanaat 2./3. soru: 'e' = Evet (raporda açıklama yok); 's' = koruyucusuz çalışması sakıncalı. Eski kayıtlardaki 'u' da 's' sayılır. */
   function sgSakincali(v) { return v === 's' || v === 'u'; }
   var SG_GURULTU_METIN = 'Gürültülü ortamda uygun kulak koruyucu kullanmadan çalışması sakıncalıdır.';
@@ -6851,7 +7034,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       soy: { anne: { d: 'S', t: '' }, baba: { d: 'S', t: '' }, kardes: { d: 'S', t: '' }, cocuk: { d: 'S', t: '' } },
       an1: SG_SOL.map(function () { return 'h'; }), an2: SG_SAG.map(function () { return 'h'; }), an1d: ['', ''],
       q: { hastane: d(), ameliyat: d(), kaza: d(), meslek: d(), malul: d(), tedavi: d(), sigara: { v: 'h', a: '', b: '', c: '', d: '', e: '' }, alkol: { v: 'h', a: '', b: '', c: '', d: '', e: '' } },
-      fizik: Object.assign({}, SG_FIZIK_VARSAYILAN), lab: {}, vit: { ta1: '', ta2: '', nb: '', boy: '', kilo: '', vki: '' }, gece: 'e', yuksek: 'e',
+      fizik: Object.assign({}, SG_FIZIK_VARSAYILAN), lab: Object.assign({}, SG_LAB_VARSAYILAN), vit: { ta1: '', ta2: '', nb: '', boy: '', kilo: '', vki: '' }, gece: 'e', yuksek: 'e',
       s: { is: '', elverisli: 'e', gurultu: 'e', toz: 'e', tedavi: { v: 'h', tur: '', pol: '' }, kisit: { v: 'h', t: '' }, dusunce: '' } };
   }
   function sgDeger(r) {
@@ -7331,6 +7514,25 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       return dosyaVer(d.dosyaAdi || (d.ad + '.' + d.uzanti), bytes);
     }).catch(function (e) { toast('İndirilemedi: ' + (e && e.message || e), 'err'); });
   }
+  /* yüklenmiş belgenin adı ve tarihi sonradan düzeltilebilir (dosya aynı kalır) */
+  function evrakDuzenle(id, sonra) {
+    var d = App.evrak.find(function (x) { return x._id === id; }); if (!d) return;
+    modal({
+      baslik: 'Belge bilgilerini düzenle',
+      govde: '<div class="field"><label for="evd_ad">Belge adı *</label><input id="evd_ad" type="text" value="' + esc(d.ad || '') + '"></div>' +
+        '<div class="field"><label for="evd_tarih">Belge tarihi *</label><input id="evd_tarih" type="date" value="' + esc(d.tarih || '') + '"></div>' +
+        '<p class="hint">Yüklenen dosya değişmez; yalnızca belge adı ve tarihi güncellenir.</p><div class="err-txt" id="evd_err"></div>',
+      onay: 'Kaydet',
+      kaydet: function (kapat) {
+        var ad = $('#evd_ad').value.trim(), tarih = $('#evd_tarih').value;
+        if (!ad || !tarih) { $('#evd_err').textContent = 'Belge adı ve belge tarihi zorunludur.'; return; }
+        var yeni = Object.assign({}, d, { ad: ad, tarih: tarih, duzenleyen: App.kullanici.adSoyad || App.kullanici.kullanici, duzenleme: new Date().toISOString() });
+        Store.set('evrak/' + id, yeni).then(function () {
+          Object.assign(d, yeni); kapat(); toast('Belge bilgileri güncellendi', 'ok'); if (sonra) sonra();
+        }).catch(function (e) { $('#evd_err').textContent = 'Kaydedilemedi: ' + (e && e.message || e); });
+      }
+    });
+  }
   function evrakSilinebilirMi() { return !!yonetimiMi(); }   // evrak takipteki belgeleri yalnızca yönetici siler
   function evrakSil(id, sonra) {
     var d = App.evrak.find(function (x) { return x._id === id; }); if (!d) return;
@@ -7355,7 +7557,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
           return '<tr><td><strong>' + esc(d.ad) + '</strong><div class="hint">' + esc((d.uzanti || '').toUpperCase()) + ' · ' + esc(kutBoyut(d.boyut)) + '</div></td>' +
             '<td>' + esc(d.tarih ? trTarih(d.tarih) : '—') + '</td><td class="opt">' + esc(d.yukleyen || '') + '</td>' +
             '<td class="cell-act"><button class="btn btn-ghost btn-sm" data-evgor="' + esc(d._id) + '">Görüntüle</button> ' +
-            '<button class="btn btn-ghost btn-sm" data-evindir="' + esc(d._id) + '">İndir</button>' +
+            '<button class="btn btn-ghost btn-sm" data-evindir="' + esc(d._id) + '">İndir</button> ' +
+            '<button class="btn btn-ghost btn-sm" data-evduz="' + esc(d._id) + '">Düzenle</button>' +
             (evrakSilinebilirMi(d) ? ' <button class="btn btn-danger btn-sm" data-evsil="' + esc(d._id) + '">Sil</button>' : '') + '</td></tr>';
         }).join('') + '</tbody></table>'
       : '<p class="hint" style="margin:0 0 6px">Bu evrak için henüz dosya yüklenmedi.</p>';
@@ -7404,6 +7607,9 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     });
     $$('[data-evgor]').forEach(function (b) { b.addEventListener('click', function () { evrakGoster(b.getAttribute('data-evgor')); }); });
     $$('[data-evindir]').forEach(function (b) { b.addEventListener('click', function () { evrakIndir(b.getAttribute('data-evindir')); }); });
+    $$('[data-evduz]').forEach(function (b) {
+      b.addEventListener('click', function () { evrakDuzenle(b.getAttribute('data-evduz'), function () { kapatFn(); render(); evrakModal(firmaId, tur); }); });
+    });
     $$('[data-evsil]').forEach(function (b) {
       b.addEventListener('click', function () {
         evrakSil(b.getAttribute('data-evsil'), function () { kapatFn(); render(); evrakModal(firmaId, tur); });

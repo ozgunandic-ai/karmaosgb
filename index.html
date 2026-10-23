@@ -2206,7 +2206,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       { ad: 'Kimyasal, fiziksel ve ergonomik risk etmenleri', dk: 10 }, { ad: 'Elle kaldırma ve taşıma', dk: 10 },
       { ad: 'Parlama, patlama', dk: 10 }, { ad: 'Yangın ve yangından korunma', dk: 10 },
       { ad: 'İş ekipmanlarının güvenli kullanımı', dk: 10 }, { ad: 'Ekranlı araçlarla çalışma', dk: 10 },
-      { ad: 'Elektrik, tehlikeleri, riskleri ve önlemleri', dk: 10 },
+      { ad: 'Elektrik, tehlikeleri, riskleri ve önlemleri', dk: 20 },
       { ad: 'İş kazalarının sebepleri ve korunma prensipleri ile tekniklerinin uygulanması', dk: 10 },
       { ad: 'Sağlık ve güvenlik işaretleri', dk: 10 }, { ad: 'Kişisel koruyucu donanım kullanımı', dk: 5 },
       { ad: 'İş sağlığı ve güvenliği genel kuralları ve güvenlik kültürü', dk: 5 }, { ad: 'Acil durumlar, tahliye ve kurtarma', dk: 10 }
@@ -3256,8 +3256,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   }
   /* Tehlike sınıfına göre 1-3. bölüm varsayılan süreleri (dk) — sıra: TEMEL_KONULAR.genel / saglik / teknik */
   var TEMEL_SURELER = {
-    'Az Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 10, 10], teknik: [10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 5, 10] },
-    'Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 20, 10], teknik: [25, 20, 20, 30, 30, 10, 10, 10, 10, 40, 10, 10] },
+    'Az Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 10, 10], teknik: [10, 10, 10, 10, 10, 10, 20, 10, 10, 5, 5, 10] },
+    'Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 20, 10], teknik: [25, 20, 20, 30, 30, 10, 20, 10, 10, 40, 10, 10] },
     'Çok Tehlikeli': { genel: [20, 20, 20, 20], saglik: [20, 20, 20, 20, 10], teknik: [40, 20, 30, 40, 40, 20, 30, 30, 30, 40, 20, 30] }
   };
   function oturumSureleriUygula(o) {

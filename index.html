@@ -1996,11 +1996,62 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     });
   }
 
+    /* ---------------- Cloudflare R2 (Pages Functions API) ---------------- */
+  function r2Api(method, yol, govde) {
+    var o = { method: method, cache: 'no-store', credentials: 'same-origin', headers: { 'X-Karma': '1' } };
+    if (govde !== undefined) { o.headers['Content-Type'] = 'application/json'; o.body = typeof govde === 'string' ? govde : JSON.stringify(govde); }
+    return fetch('/api/' + yol, o).then(function (r) {
+      return r.text().then(function (t) {
+        var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) { }
+        if (!r.ok) { var h = new Error((j && j.hata) || ('Sunucu hatası (' + r.status + ')')); h.status = r.status; throw h; }
+        return j;
+      });
+    }).catch(function (e) {
+      if (e instanceof TypeError) throw new Error('Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.');
+      throw e;
+    });
+  }
+  function r2Yol(p) { return String(p).split('/').map(encodeURIComponent).join('/'); }
+  function r2Al(path) { return r2Api('GET', 'doc/' + r2Yol(path)).catch(function (e) { if (e.status === 404) return null; throw e; }); }
+  function r2Yaz(path, veri) { return r2Api('PUT', 'doc/' + r2Yol(path), veri); }
+  function r2Sil(path) { return r2Api('DELETE', 'doc/' + r2Yol(path)); }
+  function r2Listele(coll) {
+    return r2Api('GET', 'list/' + r2Yol(coll)).then(function (j) {
+      var ids = (j && j.ids) || [], parcalar = [];
+      for (var i = 0; i < ids.length; i += 40) parcalar.push(ids.slice(i, i + 40));
+      return Promise.all(parcalar.map(function (p) {
+        return r2Api('POST', 'getmany', { paths: p.map(function (id) { return coll + '/' + id; }) }).then(function (r) {
+          return p.map(function (id) { var d = r.docs[coll + '/' + id]; if (!d) return null; d._id = id; return d; });
+        });
+      })).then(function (arr) { return [].concat.apply([], arr).filter(Boolean); });
+    });
+  }
+  // Sunucu (Cloudflare) üzerinde miyiz? Evet ise true; sunucu var ama erişim reddedildiyse hata fırlatır.
+  function r2Yokla() {
+    var zaman = new Promise(function (res) { setTimeout(function () { res(false); }, 6000); });
+    var dene = fetch('/api/ping', { cache: 'no-store', credentials: 'same-origin', headers: { 'X-Karma': '1' } }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = null; try { j = JSON.parse(t); } catch (e) { }
+        if (!j || !j.r2) return false;
+        if (!j.ok) throw new Error(j.hata || 'Sunucuya erişim reddedildi');
+        return true;
+      });
+    }).catch(function (e) { if (e instanceof TypeError) return false; throw e; });
+    return Promise.race([dene, zaman]);
+  }
+
     /* ---------------- depolama ---------------- */
   var Store = {
     mode: 'local', db: null,
     // mode: 'db' (Claude barındırmalı önizleme) | 'github' (kendi deponuz) | 'local' (yalnız bu tarayıcı) | 'setup_needed'
     init: function () {
+      var self = this;
+      return r2Yokla().then(function (r2) {
+        if (r2) { self.mode = 'r2'; return; }
+        return self._initEski();
+      });
+    },
+    _initEski: function () {
       var self = this;
       if (window.claude && typeof window.claude.use === 'function') {
         var timeout = new Promise(function (res) { setTimeout(function () { res(null); }, 12000); });
@@ -2029,6 +2080,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
           return s.exists ? JSON.parse(JSON.stringify(s.data())) : null;
         });
       }
+      if (this.mode === 'r2') return r2Al(path);
       if (this.mode === 'github') {
         return ghDocAl(path).then(function (d) { return d ? d.veri : null; });
       }
@@ -2039,12 +2091,14 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var temiz = JSON.parse(JSON.stringify(data));
       delete temiz._id;
       if (this.mode === 'db') return this.db.doc(path).set(temiz);
+      if (this.mode === 'r2') return r2Yaz(path, temiz);
       if (this.mode === 'github') return ghDocYaz(path, temiz);
       try { localStorage.setItem(this._lkey(path), JSON.stringify(temiz)); } catch (e) { return Promise.reject(e); }
       return Promise.resolve();
     },
     del: function (path) {
       if (this.mode === 'db') return this.db.doc(path).delete();
+      if (this.mode === 'r2') return r2Sil(path);
       if (this.mode === 'github') return ghDocSil(path);
       try { localStorage.removeItem(this._lkey(path)); } catch (e) { }
       return Promise.resolve();
@@ -2058,6 +2112,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
           });
         });
       }
+      if (this.mode === 'r2') return r2Listele(coll);
       if (this.mode === 'github') return ghListele(coll);
       var out = [], pre = this._lkey(coll + '/');
       try {
@@ -2458,7 +2513,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '<div class="field"><label for="k_s2">Şifre (tekrar)</label><input id="k_s2" type="password" autocomplete="new-password"></div>' +
       '<div class="err-txt" id="k_err"></div>' +
       '<button class="btn btn-primary btn-block" id="k_go">Yöneticiyi oluştur</button>' +
-      '<p class="foot">Kayıtlar ' + (Store.mode === 'db' ? 'çalışma alanınızın veritabanında' : Store.mode === 'github' ? ('GitHub deposunda (' + esc(GH.owner) + '/' + esc(GH.repo) + ')') : 'bu tarayıcıda') + ' saklanır.</p>' +
+      '<p class="foot">Kayıtlar ' + (Store.mode === 'db' ? 'çalışma alanınızın veritabanında' : Store.mode === 'r2' ? 'Cloudflare R2 özel deposunda' : Store.mode === 'github' ? ('GitHub deposunda (' + esc(GH.owner) + '/' + esc(GH.repo) + ')') : 'bu tarayıcıda') + ' saklanır.</p>' +
       '</div></div><div id="toast"></div>';
 
     function go() {
@@ -5661,7 +5716,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '<p style="margin:12px 0 14px;color:var(--muted);font-size:13px">' + App.firmalar.length + ' firma · ' + App.planlar.length + ' plan · ' + App.kullanicilar.length + ' kullanıcı</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
       (Store.mode === 'github' ? '<button class="btn btn-ghost" id="baglantiTest">Bağlantıyı test et</button>' : '') +
-      (Store.mode === 'db' ? '' : '<button class="btn btn-ghost" id="baglantiDegis">' + (Store.mode === 'github' ? 'Bağlantıyı değiştir' : 'GitHub deposuna bağlan') + '</button>') +
+      (Store.mode === 'db' || Store.mode === 'r2' ? '' : '<button class="btn btn-ghost" id="baglantiDegis">' + (Store.mode === 'github' ? 'Bağlantıyı değiştir' : 'GitHub deposuna bağlan') + '</button>') +
       '<button class="btn btn-ghost" id="yedekAl">Verileri JSON olarak indir</button>' +
       '<button class="btn btn-ghost" id="yedekYukleBtn">JSON yedeği içe aktar</button>' +
       '<input type="file" id="yedekYukle" accept="application/json" style="display:none">' +
@@ -5669,6 +5724,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   }
 
   function depolamaAciklama() {
+    if (Store.mode === 'r2') return '<p style="margin:0">Kayıtlar <strong>Cloudflare R2</strong> üzerindeki özel depoda tutuluyor; erişim yalnızca giriş yapan yetkili kullanıcılara açıktır.</p>';
     if (Store.mode === 'db') return '<p style="margin:0">Kayıtlar <strong>Claude çalışma alanı veritabanında</strong> tutuluyor; bu önizlemeyi açan herkes aynı verileri görür.</p>';
     if (Store.mode === 'github') return '<p style="margin:0">Kayıtlar <strong>GitHub deposunda</strong> tutuluyor: <code>' + esc(GH.owner) + '/' + esc(GH.repo) + '</code> · dal <code>' + esc(GH.branch) + '</code>. Bu depoya erişimi olan herkes aynı verileri görür.</p>';
     return '<p style="margin:0"><strong>Bu tarayıcıda</strong> yerel olarak tutuluyor. Başka cihazdan açtığınızda kayıtlar görünmez ve bu cihazda site verisi temizlenirse kayıtlar da silinir.</p>';

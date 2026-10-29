@@ -2,6 +2,9 @@
 // Gerekli: R2 bağlantısı  BUCKET  |  ortam değişkenleri  ACCESS_TEAM_DOMAIN, ACCESS_AUD
 // Her istek Cloudflare Access JWT'si ile doğrulanır; doğrulanamayan istek reddedilir.
 
+// Bucket içinde veriler GitHub veri deposundaki düzenle 'data/' altında durur
+const KOK = 'data/';
+
 const J = (obj, status = 200) => new Response(JSON.stringify(obj), {
   status,
   headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
@@ -74,7 +77,7 @@ export async function onRequest({ request, env }) {
   if (islem === 'doc') {
     const p = temizYol(kalan);
     if (!p) return J({ hata: 'Geçersiz yol' }, 400);
-    const key = p + '.json';
+    const key = KOK + p + '.json';
     if (method === 'GET') {
       const o = await env.BUCKET.get(key);
       if (!o) return J({ hata: 'Bulunamadı' }, 404);
@@ -99,9 +102,9 @@ export async function onRequest({ request, env }) {
     const ids = [];
     let cursor;
     do {
-      const r = await env.BUCKET.list({ prefix: p + '/', delimiter: '/', cursor });
+      const r = await env.BUCKET.list({ prefix: KOK + p + '/', delimiter: '/', cursor });
       for (const o of r.objects) {
-        const ad = o.key.slice(p.length + 1);
+        const ad = o.key.slice(KOK.length + p.length + 1);
         if (ad.endsWith('.json')) ids.push(ad.slice(0, -5));
       }
       cursor = r.truncated ? r.cursor : undefined;
@@ -118,7 +121,7 @@ export async function onRequest({ request, env }) {
     await Promise.all(yollar.map(async (p) => {
       const t = temizYol(p);
       if (!t) { docs[p] = null; return; }
-      const o = await env.BUCKET.get(t + '.json');
+      const o = await env.BUCKET.get(KOK + t + '.json');
       if (!o) { docs[p] = null; return; }
       try { docs[p] = JSON.parse(await o.text()); } catch (e) { docs[p] = null; }
     }));

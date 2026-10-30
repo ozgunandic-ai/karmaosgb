@@ -3474,8 +3474,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
           var m = /^☐\s*(.+)$/.exec(foMetin(p)); if (!m) return;
           var nm = foNorm(m[1]), k = tum.filter(function (x) { var a = foNorm(x.ad); return a === nm || a.indexOf(nm) === 0 || nm.indexOf(a) === 0; })[0]; if (!k) return;
           egSdtIsaretle(p, k.tikli);
-          if (k.dk) { var ts = foWel(p, 't'); ts[ts.length - 1].textContent += '  (' + k.dk + ' dk)'; }
-        });
+                  });
       });
       /* 4. işe ve işyerine özgü riskler: yalnızca işyerinin sınıfına ait başlık ve maddeler kalır */
       var ps = foWel(hc[2], 'p'), ia = -1, ig = -1, ib = -1;
@@ -3485,11 +3484,11 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         sat.forEach(function (p, i) {
           var it = items[i];
           if (!it) { adSil(p); return; }
-          egSdtIsaretle(p, true); var ts = foWel(p, 't'); ts[ts.length - 1].textContent = ' ' + it.ad + (it.dk ? '  (' + it.dk + ' dk)' : '');
+          egSdtIsaretle(p, true); var ts = foWel(p, 't'); ts[ts.length - 1].textContent = ' ' + it.ad;
         });
         for (var j = sat.length; j < items.length; j++) {          // şablondaki satırlar yetmezse çoğalt
           var prev = sat[sat.length - 1] || null; if (!prev || !prev.parentNode) break;
-          var np = prev.cloneNode(true); egSdtIsaretle(np, true); var t2 = foWel(np, 't'); t2[t2.length - 1].textContent = ' ' + items[j].ad + (items[j].dk ? '  (' + items[j].dk + ' dk)' : '');
+          var np = prev.cloneNode(true); egSdtIsaretle(np, true); var t2 = foWel(np, 't'); t2[t2.length - 1].textContent = ' ' + items[j].ad;
           prev.parentNode.insertBefore(np, prev.nextSibling); sat.push(np);
         }
       };
@@ -3655,8 +3654,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   ];
   function gunVarsayilan() {
     return [
-      { konu: { genel: true, saglik: true, teknik: false, ozgu: false }, uzman: true, hekim: true },
-      { konu: { genel: false, saglik: false, teknik: true, ozgu: true }, uzman: true, hekim: true }
+      { konu: { genel: true, saglik: true, teknik: false, ozgu: false }, uzman: true, hekim: true, sure: '' },
+      { konu: { genel: false, saglik: false, teknik: true, ozgu: true }, uzman: true, hekim: true, sure: '' }
     ];
   }
   function oturumIkiGunMu(o) { return o.egitimTuru === 'temel' && !!o.ikinciTarih; }
@@ -3678,7 +3677,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   function gunKaydi(o, gi) {
     var g = o.gunler[gi], c = JSON.parse(JSON.stringify(o));
     c.tarih1 = gi === 0 ? o.tarih1 : o.tarih2; c.tarih2 = ''; c.ikinciTarih = false;
-    c.egitimSuresi = dakikaMetni(gunDakika(o, gi)) || o.egitimSuresi || '';
+    var gs = String(g.sure === undefined ? '' : g.sure).trim().replace(',', '.');
+    c.egitimSuresi = gs ? (/^[0-9.]+$/.test(gs) ? gs.replace('.', ',') + ' saat' : gs) : (dakikaMetni(gunDakika(o, gi)) || o.egitimSuresi || '');
     c._egitmenListesi = [];
     if (g.uzman) c._egitmenListesi.push(o.uzmanAdi ? o.uzmanAdi + (o.uzmanUnvan ? ' — ' + o.uzmanUnvan : '') : '');
     if (g.hekim) c._egitmenListesi.push(o.hekimAdi ? o.hekimAdi + (o.hekimUnvan ? ' — ' + o.hekimUnvan : '') : '');
@@ -3700,7 +3700,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         '<div class="qt" style="margin:12px 0 4px">Bu gün eğitimi verenler</div>' +
         '<div class="ck-satir"><label class="ck"><input type="checkbox" data-gun="' + gi + ':egt:uzman"' + (g.uzman ? ' checked' : '') + '><span>İş güvenliği uzmanı' + (o.uzmanAdi ? ' — ' + esc(o.uzmanAdi) : '') + '</span></label></div>' +
         '<div class="ck-satir"><label class="ck"><input type="checkbox" data-gun="' + gi + ':egt:hekim"' + (g.hekim ? ' checked' : '') + '><span>İşyeri hekimi' + (o.hekimAdi ? ' — ' + esc(o.hekimAdi) : '') + '</span></label></div>' +
-        '<p class="hint" style="margin-top:8px">Bu günün süresi (tikli konuların toplamı): <strong>' + (dakikaMetni(gunDakika(o, gi)) || '—') + '</strong></p></div>';
+        '<p class="hint" style="margin-top:8px">Bu günün süresi (tikli konuların toplamı): <strong>' + (dakikaMetni(gunDakika(o, gi)) || '—') + '</strong></p>' +
+        '<div class="field" style="max-width:240px;margin-top:8px"><label for="gun_sure' + gi + '">' + (gi + 1) + '. gün eğitim süresi (saat)</label><input id="gun_sure' + gi + '" type="text" inputmode="decimal" data-gunsure="' + gi + '" placeholder="ör. 4" value="' + esc(g.sure || '') + '"><p class="hint">Tutanakta “Eğitim Süresi” olarak bu yazılır.</p></div></div>';
     });
     return h + '</div><p class="hint" style="margin-top:12px">Bir eğitim grubu her iki güne de işaretlenebilir. Günde tek eğitimci varsa yalnızca onu işaretleyin; o günün tutanağında yalnızca işaretli eğitimci yer alır. Tutanakta o güne ait olmayan konular işaretsiz görünür.</p></div></div>';
   }
@@ -4672,6 +4673,9 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         if (p[1] === 'konu') g.konu[p[2]] = el.checked; else g[p[2]] = el.checked;
         kirlet(); yeniden();
       });
+    });
+    $$('[data-gunsure]', kok).forEach(function (el) {
+      el.addEventListener('input', function () { o.gunler[+el.getAttribute('data-gunsure')].sure = el.value; kirlet(); });
     });
     // konu süresi değişince gün süreleri de güncellensin
     $$('[data-dk]', kok).forEach(function (el) { el.addEventListener('change', function () { if (oturumIkiGunMu(o)) yeniden(); }); });

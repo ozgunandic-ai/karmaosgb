@@ -2672,9 +2672,9 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     if (r.ad === 'thliste') return renderKabuk(viewThListe()), bindThListe();
     if (r.ad === 'firmalar') return renderKabuk(viewFirmalar());
     if (r.ad === 'firma') return renderKabuk(viewFirma(r.id)), bindFirma();
-    if (r.ad === 'planlar') return renderKabuk(viewPlanlar());
+    if (r.ad === 'planlar') return renderKabuk(viewPlanlar()), bindPlanSecici('plan');
     if (r.ad === 'plan') return renderPlan();
-    if (r.ad === 'egitimler') return renderKabuk(viewEgitimler());
+    if (r.ad === 'egitimler') return renderKabuk(viewEgitimler()), bindPlanSecici('egpl');
     if (r.ad === 'egitim') return renderEgitim();
     if (r.ad === 'oturumlar') return renderKabuk(viewOturumlar()), bindOturumlar();
     if (r.ad === 'oturum') return renderOturum();
@@ -2771,7 +2771,26 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   }
 
   /* Firma arama (Firmalar ve Evrak Takip sayfaları): önek 'firma' veya 'evrak' */
-  var ARA_METIN = { firma: '', evrak: '' };
+  var ARA_METIN = { firma: '', evrak: '', plan: '', egpl: '' };
+  /* Plan sayfaları: firma seçerek plan oluşturma çubuğu (tür: 'plan' = Yıllık İSG, 'egpl' = Yıllık Eğitim) */
+  function planFirmaSecici(tur) {
+    var firmalar = benimFirmalarim().slice().sort(function (a, b) { return (a.unvan || '').localeCompare(b.unvan || '', 'tr'); });
+    if (!firmalar.length) return '';
+    return '<div class="card" style="margin-bottom:12px"><div class="card-h"><h2>Firma seçerek ' + (tur === 'plan' ? 'yıllık İSG planı' : 'yıllık eğitim planı') + ' hazırla</h2></div>' +
+      '<div class="card-b" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      '<select id="' + tur + 'Firma" style="flex:1;min-width:240px"><option value="">— firma seçin —</option>' +
+      firmalar.map(function (f) { return '<option value="' + esc(f._id) + '">' + esc((f.kisaAd && f.kisaAd.trim() ? f.kisaAd.trim() + ' — ' : '') + f.unvan) + '</option>'; }).join('') +
+      '</select><button type="button" class="btn btn-primary" id="' + tur + 'Olustur">' + (tur === 'plan' ? 'Yıllık İSG planı hazırla' : 'Yıllık eğitim planı hazırla') + '</button></div></div>';
+  }
+  function bindPlanSecici(tur) {
+    var b = $('#' + tur + 'Olustur'); if (!b) return;
+    b.addEventListener('click', function () {
+      var id = $('#' + tur + 'Firma').value;
+      if (!id) { toast('Önce bir firma seçin', 'err'); return; }
+      if (tur === 'plan') yilSor(id); else egitimYilSor(id);
+    });
+    if (ARA_METIN[tur]) firmaAraUygula(tur);
+  }
   function firmaAraKutusu(on, yer) {
     return '<div class="card" style="margin-bottom:12px"><div class="card-b" style="display:flex;gap:8px;align-items:center">' +
       '<input id="' + on + 'Ara" type="search" autocomplete="off" placeholder="' + yer + '" style="flex:1" value="' + esc(ARA_METIN[on]) + '">' +
@@ -2785,9 +2804,9 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var g = !q || q.split(' ').every(function (w) { return tr.getAttribute('data-ara').indexOf(w) >= 0; });
       tr.style.display = g ? '' : 'none'; if (g) say++;
     });
-    var r = $('#' + on + 'AraSonuc'); if (r) r.textContent = q ? (say ? say + ' firma bulundu' : 'Eşleşen firma yok') : '';
+    var r = $('#' + on + 'AraSonuc'); if (r) r.textContent = q ? (say ? say + (on === 'plan' || on === 'egpl' ? ' plan bulundu' : ' firma bulundu') : (on === 'plan' || on === 'egpl' ? 'Eşleşen plan yok' : 'Eşleşen firma yok')) : '';
   }
-  function firmaAraOn(id) { var m = /^(firma|evrak)Ara/.exec(id || ''); return m ? m[1] : null; }
+  function firmaAraOn(id) { var m = /^(firma|evrak|plan|egpl)Ara/.exec(id || ''); return m ? m[1] : null; }
   document.addEventListener('input', function (e) {
     var on = e.target && e.target.id === (firmaAraOn(e.target.id) + 'Ara') ? firmaAraOn(e.target.id) : null;
     if (on) { ARA_METIN[on] = e.target.value; firmaAraUygula(on); }
@@ -3089,16 +3108,17 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       .slice().sort(function (a, b) { return (b.yil - a.yil) || 0; });
     var h = '<div class="phead"><div><h1>Yıllık Eğitim Planları</h1>' +
       '<p class="psub">' + (yonetimiMi() ? 'Tüm firmalar için hazırlanan yıllık eğitim planları.' : 'Size atanan firmalar için hazırlanan yıllık eğitim planları.') + '</p></div></div>';
+    h += planFirmaSecici('egpl');
     if (!list.length) {
       return h + '<div class="card"><div class="empty"><h3>Henüz eğitim planı yok</h3>' +
-        '<p>Bir firma açıp o firma için yıllık eğitim planını oluşturun.</p>' +
-        '<button class="btn btn-primary" data-goto="firmalar">Firmalara git</button></div></div>';
+        '<p>Yukarıdan bir firma seçerek yıllık eğitim planını hazırlayabilirsiniz.</p></div></div>';
     }
+    h += firmaAraKutusu('egpl', 'Plan ara: firma ünvanı, kısaltma, yıl…');
     h += '<div class="card"><div class="card-b tight"><table class="tbl"><thead><tr>' +
       '<th>Yıl</th><th>İşyeri</th><th class="opt">Eğitim sayısı</th><th class="opt">Son güncelleme</th><th></th></tr></thead><tbody>' +
       list.map(function (p) {
         var f = App.firmalar.find(function (x) { return x._id === p.firmaId; }) || {};
-        return '<tr><td><strong>' + esc(p.yil) + '</strong></td>' +
+        return '<tr data-ara="' + esc(trNorm([f.unvan, f.kisaAd, f.isveren, f.uzman, f.hekim, f.tehlike, p.yil].join(' '))) + '"><td><strong>' + esc(p.yil) + '</strong></td>' +
           '<td><button class="row-link" data-egitim="' + p._id + '" style="background:none;border:none;padding:0;text-align:left"' + (f.kisaAd ? ' title="' + esc(f.unvan || '') + '"' : '') + '>' + esc(firmaKisa(f) || '(silinmiş firma)') + '</button></td>' +
           '<td class="opt">' + (p.egitimler || []).length + ' eğitim</td>' +
           '<td class="opt">' + esc(trTarih((p.guncelleme || '').slice(0, 10))) + '</td>' +
@@ -3438,8 +3458,14 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       if (logo && foLogoKoy(doc, f, false)) egLogoPaketle(dosyalar, logo); else if (tcL) adHucreYaz(tcL, unvan);
       /* eğitim bilgileri */
       var t3 = adTrler(T[3]), yaz = function (tr, i, v) { var h = foHucreler(tr); if (v) foHucreYaz(h[i], v, h[i - 1]); };
-      yaz(t3[0], 1, o.uzmanAdi ? o.uzmanAdi + (o.uzmanUnvan ? ' — ' + o.uzmanUnvan : '') : '');
-      yaz(t3[1], 1, o.hekimAdi ? o.hekimAdi + (o.hekimUnvan ? ' — ' + o.hekimUnvan : '') : '');
+      if (o._egitmenListesi && o._egitmenListesi.length) {
+        /* iki günlük eğitimde o güne ait eğitimciler: tek eğitimci varsa ikinci satır kaldırılır */
+        yaz(t3[0], 1, o._egitmenListesi[0] || '');
+        if (o._egitmenListesi.length > 1) yaz(t3[1], 1, o._egitmenListesi[1] || ''); else adSil(t3[1]);
+      } else {
+        yaz(t3[0], 1, o.uzmanAdi ? o.uzmanAdi + (o.uzmanUnvan ? ' — ' + o.uzmanUnvan : '') : '');
+        yaz(t3[1], 1, o.hekimAdi ? o.hekimAdi + (o.hekimUnvan ? ' — ' + o.hekimUnvan : '') : '');
+      }
       yaz(t3[2], 1, o.egitimYeri || ''); yaz(t3[3], 1, oturumTarihMetni(o)); yaz(t3[3], 3, o.egitimSuresi || '');
       /* konular: şablondaki hazır maddeler işaretlenir, süre varsa yanına yazılır */
       var tum = kon.genel.concat(kon.saglik, kon.teknik), hc = foHucreler(adTrler(T[6])[0]);
@@ -3617,8 +3643,66 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       turu: 'ilk', sekli: 'yuzyuze',
       belgeTarihi: '', belgeElle: false,
       konular: oturumKonulariHazirla(), ozguGrup: 'A',
+      gunler: gunVarsayilan(),
       katilimcilar: [{ adSoyad: '', gorev: '' }]
     };
+  }
+
+  /* ---- İki günlük temel eğitim: hangi gün hangi konu grubu, kim anlatıyor ---- */
+  var GUN_GRUPLARI = [
+    { k: 'genel', ad: '1. GENEL KONULAR' }, { k: 'saglik', ad: '2. SAĞLIK KONULARI' },
+    { k: 'teknik', ad: '3. TEKNİK KONULAR' }, { k: 'ozgu', ad: '4. İŞE VE İŞYERİNE ÖZGÜ RİSKLER VE RİSK DEĞERLENDİRMESİNE DAYALI KONULAR' }
+  ];
+  function gunVarsayilan() {
+    return [
+      { konu: { genel: true, saglik: true, teknik: false, ozgu: false }, uzman: true, hekim: true },
+      { konu: { genel: false, saglik: false, teknik: true, ozgu: true }, uzman: true, hekim: true }
+    ];
+  }
+  function oturumIkiGunMu(o) { return o.egitimTuru === 'temel' && !!o.ikinciTarih; }
+  function gunDakika(o, gi) {
+    var g = o.gunler[gi], top = 0;
+    GUN_GRUPLARI.forEach(function (gr) {
+      if (!g.konu[gr.k]) return;
+      var listeler = gr.k === 'ozgu' ? [o.konular.ozguA, o.konular.ozguB] : [o.konular[gr.k]];
+      listeler.forEach(function (l) { (l || []).forEach(function (x) { if (x.tikli) top += (+x.dk || 0); }); });
+    });
+    return top;
+  }
+  function dakikaMetni(dk) {
+    if (!dk) return '';
+    var s = Math.floor(dk / 60), d = dk % 60;
+    return (s ? s + ' saat' : '') + (s && d ? ' ' : '') + (d ? d + ' dk' : '');
+  }
+  /* günün tutanağı için kaydın kopyası: yalnızca o günün tarihi, eğitimcileri, konu grupları ve süresi */
+  function gunKaydi(o, gi) {
+    var g = o.gunler[gi], c = JSON.parse(JSON.stringify(o));
+    c.tarih1 = gi === 0 ? o.tarih1 : o.tarih2; c.tarih2 = ''; c.ikinciTarih = false;
+    c.egitimSuresi = dakikaMetni(gunDakika(o, gi)) || o.egitimSuresi || '';
+    c._egitmenListesi = [];
+    if (g.uzman) c._egitmenListesi.push(o.uzmanAdi ? o.uzmanAdi + (o.uzmanUnvan ? ' — ' + o.uzmanUnvan : '') : '');
+    if (g.hekim) c._egitmenListesi.push(o.hekimAdi ? o.hekimAdi + (o.hekimUnvan ? ' — ' + o.hekimUnvan : '') : '');
+    ['genel', 'saglik', 'teknik'].forEach(function (k) {
+      if (!g.konu[k]) c.konular[k].forEach(function (x) { x.tikli = false; });
+    });
+    if (!g.konu.ozgu) { c.konular.ozguA.forEach(function (x) { x.tikli = false; }); c.konular.ozguB.forEach(function (x) { x.tikli = false; }); }
+    return c;
+  }
+  function oturumGunBolumu(o) {
+    var h = '<div class="card"><div class="card-h"><h2>5. Günlere göre eğitim dağılımı</h2><span class="ch-sub">Her gün için ayrı Eğitim Katılım Tutanağı hazırlanır</span></div><div class="card-b"><div class="grid2">';
+    [0, 1].forEach(function (gi) {
+      var g = o.gunler[gi], tarih = gi === 0 ? o.tarih1 : o.tarih2;
+      h += '<div><div class="ck-baslik" style="font-size:13px;margin-bottom:8px">' + (gi + 1) + '. GÜN' + (tarih ? ' — ' + esc(trTarih(tarih)) : ' <span class="hint">(tarih seçilmedi)</span>') + '</div>' +
+        '<div class="qt" style="margin:6px 0 4px">Bu gün verilecek eğitimler</div>' +
+        GUN_GRUPLARI.map(function (gr) {
+          return '<div class="ck-satir"><label class="ck"><input type="checkbox" data-gun="' + gi + ':konu:' + gr.k + '"' + (g.konu[gr.k] ? ' checked' : '') + '><span>' + gr.ad + '</span></label></div>';
+        }).join('') +
+        '<div class="qt" style="margin:12px 0 4px">Bu gün eğitimi verenler</div>' +
+        '<div class="ck-satir"><label class="ck"><input type="checkbox" data-gun="' + gi + ':egt:uzman"' + (g.uzman ? ' checked' : '') + '><span>İş güvenliği uzmanı' + (o.uzmanAdi ? ' — ' + esc(o.uzmanAdi) : '') + '</span></label></div>' +
+        '<div class="ck-satir"><label class="ck"><input type="checkbox" data-gun="' + gi + ':egt:hekim"' + (g.hekim ? ' checked' : '') + '><span>İşyeri hekimi' + (o.hekimAdi ? ' — ' + esc(o.hekimAdi) : '') + '</span></label></div>' +
+        '<p class="hint" style="margin-top:8px">Bu günün süresi (tikli konuların toplamı): <strong>' + (dakikaMetni(gunDakika(o, gi)) || '—') + '</strong></p></div>';
+    });
+    return h + '</div><p class="hint" style="margin-top:12px">Bir eğitim grubu her iki güne de işaretlenebilir. Günde tek eğitimci varsa yalnızca onu işaretleyin; o günün tutanağında yalnızca işaretli eğitimci yer alır. Tutanakta o güne ait olmayan konular işaretsiz görünür.</p></div></div>';
   }
 
   function oturumTamamla(o) {
@@ -3632,6 +3716,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       o.ozguGrup = azMi ? 'B' : 'A';
       delete o.konular.ozgu;
     }
+    if (!Array.isArray(o.gunler) || o.gunler.length < 2) o.gunler = gunVarsayilan();
     if (o.konular && !o.konular.ozguA) o.konular.ozguA = ozguVarsayilan(true);
     if (o.konular && !o.konular.ozguB) o.konular.ozguB = ozguVarsayilan(false);
     return o;
@@ -4486,8 +4571,11 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         '<div style="margin-top:12px">' + oturumOzguBolumu() + '</div></div></div>';
     }
 
-    // 5) Katılımcılar
-    h += '<div class="card"><div class="card-h"><h2>' + (temel ? '5' : '4') + '. Eğitim alacak kişiler</h2><span class="ch-sub">' + (temel ? 14 : 18) + ' kişiden sonrası için tutanak aynı biçimde ikinci kez oluşturulur; numaralar kaldığı yerden devam eder</span></div><div class="card-b">' +
+    // 5) İki günlük eğitimde günlere göre dağılım
+    if (oturumIkiGunMu(o)) h += oturumGunBolumu(o);
+
+    // 5/6) Katılımcılar
+    h += '<div class="card"><div class="card-h"><h2>' + (temel ? (oturumIkiGunMu(o) ? '6' : '5') : '4') + '. Eğitim alacak kişiler</h2><span class="ch-sub">' + (temel ? 14 : 18) + ' kişiden sonrası için tutanak aynı biçimde ikinci kez oluşturulur; numaralar kaldığı yerden devam eder</span></div><div class="card-b">' +
       o.katilimcilar.map(function (k, i) {
         return '<div class="memberrow"><span class="hint" style="min-width:26px">' + (i + 1) + '.</span>' +
           '<input type="text" data-k="' + i + ':adSoyad" value="' + esc(k.adSoyad) + '" placeholder="Adı soyadı" style="flex:0 0 40%">' +
@@ -4501,7 +4589,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
 
     h += '<div class="savebar"><span class="sb-info" id="oSbInfo">Tüm değişiklikler kaydedilmeye hazır</span><span class="sb-space"></span>' +
       '<button class="btn btn-dark" id="oKaydet">Kaydet</button>' +
-      '<button class="btn btn-primary" id="oTutanak">Eğitim Katılım Tutanağı Bas</button>' +
+      '<button class="btn btn-primary" id="oTutanak">' + (oturumIkiGunMu(o) ? 'Eğitim Katılım Tutanaklarını Bas (2 gün)' : 'Eğitim Katılım Tutanağı Bas') + '</button>' +
       (true ? '<button class="btn btn-primary" id="oBelge">Eğitim Belgesi Bas</button>' : '') + '</div>';
     return h;
   }
@@ -4576,6 +4664,18 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       el.addEventListener('click', function () { o.konular[el.getAttribute('data-ozguekle')].push({ ad: '', dk: '', tikli: true, ozel: true }); kirlet(); yeniden(); });
     });
     oturumToplamGuncelle();
+
+    // iki günlük eğitim: gün bazlı konu grubu / eğitimci seçimi
+    $$('[data-gun]', kok).forEach(function (el) {
+      el.addEventListener('change', function () {
+        var p = el.getAttribute('data-gun').split(':'), g = o.gunler[+p[0]];
+        if (p[1] === 'konu') g.konu[p[2]] = el.checked; else g[p[2]] = el.checked;
+        kirlet(); yeniden();
+      });
+    });
+    // konu süresi değişince gün süreleri de güncellensin
+    $$('[data-dk]', kok).forEach(function (el) { el.addEventListener('change', function () { if (oturumIkiGunMu(o)) yeniden(); }); });
+    $$('[data-ck]', kok).forEach(function (el) { el.addEventListener('change', function () { if (oturumIkiGunMu(o)) yeniden(); }); });
 
     // katılımcılar
     $$('[data-k]', kok).forEach(function (el) {
@@ -4655,6 +4755,23 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         .then(function () { return oturumKaydet(false); }).catch(function (e) { toast('Tutanak hazırlanamadı: ' + (e && e.message || e), 'err'); });
       return;
     }
+    if (oturumIkiGunMu(o)) {
+      if (!o.tarih2) { toast('2. günün tarihini seçin (veya “2. tarihi kaldır” deyin)', 'err'); return; }
+      for (var gi = 0; gi < 2; gi++) {
+        var g = o.gunler[gi];
+        if (!GUN_GRUPLARI.some(function (gr) { return g.konu[gr.k]; })) { toast((gi + 1) + '. gün için en az bir eğitim başlığı işaretleyin', 'err'); return; }
+        if (!g.uzman && !g.hekim) { toast((gi + 1) + '. gün için en az bir eğitimci işaretleyin', 'err'); return; }
+      }
+      Promise.all([temelTutanak(gunKaydi(o, 0)), temelTutanak(gunKaydi(o, 1))]).then(function (b) {
+        var on = slug(oturumFirmaKisa(o) || 'egitim') + '_Egitim_Katilim_Tutanagi_';
+        return dosyaVer(on + o.tarih1 + '_ve_' + o.tarih2 + '.zip', window.KarmaGen.buildZip([
+          { name: '1_Gun_' + on + o.tarih1 + '.docx', data: b[0] },
+          { name: '2_Gun_' + on + o.tarih2 + '.docx', data: b[1] }
+        ]));
+      }).then(function () { toast('İki günün tutanağı ZIP içinde indirildi', 'ok'); return oturumKaydet(false); })
+        .catch(function (e) { toast('Tutanak hazırlanamadı: ' + (e && e.message || e), 'err'); });
+      return;
+    }
     temelTutanak(o).then(function (b) { return dosyaVer(oturumDosyaAdi(o, 'Egitim_Katilim_Tutanagi'), b); })
       .then(function () { return oturumKaydet(false); }).catch(function (e) { toast('Tutanak hazırlanamadı: ' + (e && e.message || e), 'err'); });
   }
@@ -4715,16 +4832,17 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       .slice().sort(function (a, b) { return (b.yil - a.yil) || 0; });
     var h = '<div class="phead"><div><h1>Yıllık İSG Planları</h1>' +
       '<p class="psub">' + (yonetimiMi() ? 'Tüm firmalar için hazırlanan çalışma planları.' : 'Size atanan firmalar için hazırlanan çalışma planları.') + '</p></div></div>';
+    h += planFirmaSecici('plan');
     if (!list.length) {
       return h + '<div class="card"><div class="empty"><h3>Henüz plan yok</h3>' +
-        '<p>Bir firma açıp o firma için yıllık planı oluşturun.</p>' +
-        '<button class="btn btn-primary" data-goto="firmalar">Firmalara git</button></div></div>';
+        '<p>Yukarıdan bir firma seçerek yıllık İSG planını hazırlayabilirsiniz.</p></div></div>';
     }
+    h += firmaAraKutusu('plan', 'Plan ara: firma ünvanı, kısaltma, yıl…');
     h += '<div class="card"><div class="card-b tight"><table class="tbl"><thead><tr>' +
       '<th>Yıl</th><th>İşyeri</th><th class="opt">İSG kurulu</th><th>İmzalı plan</th><th class="opt">Son güncelleme</th><th></th></tr></thead><tbody>' +
       list.map(function (p) {
         var f = App.firmalar.find(function (x) { return x._id === p.firmaId; }) || {};
-        return '<tr><td><strong>' + esc(p.yil) + '</strong></td>' +
+        return '<tr data-ara="' + esc(trNorm([f.unvan, f.kisaAd, f.isveren, f.uzman, f.hekim, f.tehlike, p.yil].join(' '))) + '"><td><strong>' + esc(p.yil) + '</strong></td>' +
           '<td><button class="row-link" data-plan="' + p._id + '" style="background:none;border:none;padding:0;text-align:left">' + esc(f.unvan || '(silinmiş firma)') + '</button>' + firmaKisaSatir(f) + '</td>' +
           '<td class="opt">' + (p.altmis === 'evet' ? '<span class="tag">Zorunlu değil</span>' : '<span class="tag tag-red">' + esc(periyotAdi(p.kurulPeriyot)) + '</span>') + '</td>' +
           '<td>' + imzaliPlanEtiket(p) + '</td>' +

@@ -3495,7 +3495,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       if (grup === 'A') { doldur(satA, kon.ozguA); [ps[ig], ps[ib]].concat(satB).forEach(adSil); }
       else { doldur(satB, kon.ozguB); adSil(ps[ia]); satA.forEach(adSil); }
       /* katılımcılar: her formda 15 kişi; fazlası için formun tamamı yeni sayfada tekrarlanır ve numaralar kaldığı yerden devam eder */
-      var KAP = 14, kat = oturumKatilimcilari(o), sayfa = Math.max(1, Math.ceil(kat.length / KAP)), tablolar = [T[9]];
+      var KAP = 15, kat = oturumKatilimcilari(o), sayfa = Math.max(1, Math.ceil(kat.length / KAP)), tablolar = [T[9]];
       var son = T[10];
       if (son && son.localName === 'p') { while (son.firstChild) son.removeChild(son.firstChild); son.appendChild(doc.importNode(new DOMParser().parseFromString('<w:pPr xmlns:w="' + WNS + '"><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>', 'application/xml').documentElement, true)); }
       if (sayfa > 1) {
@@ -3506,7 +3506,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         }
       }
       tablolar.forEach(function (tbl, sy) {
-        adTrler(tbl).slice(1 + KAP).forEach(adSil);      // şablondaki fazla satır silinir: bir sayfada en fazla 14 kişi
+        adTrler(tbl).slice(1 + KAP).forEach(adSil);      // şablondaki fazla satır silinir: bir sayfada en fazla 15 kişi
         adTrler(tbl).slice(1).forEach(function (tr, i) {
           var h = foHucreler(tr), k = kat[sy * KAP + i];
           adHucreYaz(h[0], String(sy * KAP + i + 1));
@@ -4576,7 +4576,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     if (oturumIkiGunMu(o)) h += oturumGunBolumu(o);
 
     // 5/6) Katılımcılar
-    h += '<div class="card"><div class="card-h"><h2>' + (temel ? (oturumIkiGunMu(o) ? '6' : '5') : '4') + '. Eğitim alacak kişiler</h2><span class="ch-sub">' + (temel ? 14 : 18) + ' kişiden sonrası için tutanak aynı biçimde ikinci kez oluşturulur; numaralar kaldığı yerden devam eder</span></div><div class="card-b">' +
+    h += '<div class="card"><div class="card-h"><h2>' + (temel ? (oturumIkiGunMu(o) ? '6' : '5') : '4') + '. Eğitim alacak kişiler</h2><span class="ch-sub">' + (temel ? 15 : 18) + ' kişiden sonrası için tutanak aynı biçimde ikinci kez oluşturulur; numaralar kaldığı yerden devam eder</span></div><div class="card-b">' +
       o.katilimcilar.map(function (k, i) {
         return '<div class="memberrow"><span class="hint" style="min-width:26px">' + (i + 1) + '.</span>' +
           '<input type="text" data-k="' + i + ':adSoyad" value="' + esc(k.adSoyad) + '" placeholder="Adı soyadı" style="flex:0 0 40%">' +
@@ -4585,7 +4585,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
           '<button class="btn btn-quiet" data-ksil="' + i + '" aria-label="Sil">✕</button></div>';
       }).join('') +
       '<div class="gtools"><button class="btn btn-ghost btn-sm" id="kEkle">+ Kişi ekle</button> <span class="gcount">' +
-      o.katilimcilar.filter(function (k) { return k.adSoyad; }).length + ' kişi · ' + Math.max(1, Math.ceil(o.katilimcilar.length / (temel ? 14 : 18))) + ' tutanak sayfası</span></div>' +
+      o.katilimcilar.filter(function (k) { return k.adSoyad; }).length + ' kişi · ' + Math.max(1, Math.ceil(o.katilimcilar.length / (temel ? 15 : 18))) + ' tutanak sayfası</span></div>' +
       (true ? '<p class="hint" style="margin-top:8px">“Eğitim Belgesi Bas”: her katılımcı için ayrı, 2 sayfalık (belge + eğitim konuları) Word dosyası hazırlanır; birden çok kişi varsa dosyalar tek bir ZIP içinde iner. Satırdaki “Belge” düğmesi yalnızca o kişi içindir.</p>' : '') + '</div></div>';
 
     h += '<div class="savebar"><span class="sb-info" id="oSbInfo">Tüm değişiklikler kaydedilmeye hazır</span><span class="sb-space"></span>' +

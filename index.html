@@ -1777,9 +1777,10 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     return !!(yonetimiMi() || (olusturan && App.kullanici && olusturan === App.kullanici.kullanici));
   }
   function benimFirmalarim() {
-    if (yonetimiMi()) return App.firmalar;
+    /* pasif firmalar çalışma listelerinde (plan, eğitim, evrak vb.) yer almaz; yalnızca yönetici “Firmalar” sayfasında görür */
+    if (yonetimiMi()) return App.firmalar.filter(function (f) { return !f.pasif; });
     var ku = App.kullanici && App.kullanici.kullanici;
-    return App.firmalar.filter(function (f) { return f.uzmanKullanici === ku || f.hekimKullanici === ku; });
+    return App.firmalar.filter(function (f) { return !f.pasif && (f.uzmanKullanici === ku || f.hekimKullanici === ku); });
   }
   function firmayaErisimVarMi(firmaId) {
     if (yonetimiMi()) return true;
@@ -2823,7 +2824,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     firmaAraUygula(on); if (i) i.focus();
   });
   function viewFirmalar() {
-    var list = benimFirmalarim().slice().sort(function (a, b) { return (a.unvan || '').localeCompare(b.unvan || '', 'tr'); });
+    var list = (yonetimiMi() ? App.firmalar : benimFirmalarim()).slice().sort(function (a, b) { return ((a.pasif ? 1 : 0) - (b.pasif ? 1 : 0)) || (a.unvan || '').localeCompare(b.unvan || '', 'tr'); });
     var h = '<div class="phead"><div><h1>Firmalar</h1>' +
       '<p class="psub">' + list.length + ' kayıtlı işyeri' + (yonetimiMi() ? '' : ' · size atanan') + '. Firma bilgileri tüm belgelere otomatik işlenir.</p></div>' +
       (yonetimiMi() ? '<div class="pact"><button class="btn btn-primary" id="yeniFirma">Yeni firma</button></div>' : '') + '</div>';
@@ -2843,7 +2844,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '</tr></thead><tbody>' +
       list.map(function (f) {
         var n = App.planlar.filter(function (p) { return p.firmaId === f._id; }).length;
-        return '<tr data-ara="' + esc(trNorm([f.unvan, f.kisaAd, f.isveren, f.faaliyet, f.uzman, f.hekim, f.tehlike, f.sgk].join(' '))) + '"><td><button class="row-link" data-firma="' + f._id + '" style="background:none;border:none;padding:0;text-align:left">' + esc(f.unvan) + '</button>' +
+        return '<tr data-ara="' + esc(trNorm([f.unvan, f.kisaAd, f.isveren, f.faaliyet, f.uzman, f.hekim, f.tehlike, f.sgk, f.pasif ? 'pasif' : ''].join(' '))) + '"' + (f.pasif ? ' style="opacity:.6"' : '') + '><td><button class="row-link" data-firma="' + f._id + '" style="background:none;border:none;padding:0;text-align:left">' + esc(f.unvan) + '</button>' +
+          (f.pasif ? ' <span class="tag tag-warn">Pasif</span>' : '') +
           (n ? ' <span class="tag">' + n + ' plan</span>' : '') +
           firmaKisaSatir(f) +
           (f.isveren ? '<div style="font-size:12px;color:var(--muted)">İşveren: ' + esc(f.isveren) + '</div>' : '') + '</td>' +
@@ -2851,7 +2853,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
           '<td><span class="tag ' + (f.tehlike === 'Çok Tehlikeli' ? 'tag-red' : f.tehlike === 'Tehlikeli' ? 'tag-warn' : 'tag-ok') + '">' + esc(f.tehlike || '—') + '</span></td>' +
           '<td class="opt">' + esc(f.uzman || '—') + '</td><td class="opt">' + esc(f.hekim || '—') + '</td>' +
           '<td class="cell-act"><button class="btn btn-ghost btn-sm" data-firma="' + f._id + '">Aç</button>' +
-          (yonetimiMi() ? ' <button class="btn btn-danger btn-sm" data-firmasil="' + f._id + '">Sil</button>' : '') + '</td></tr>';
+          (yonetimiMi() ? ' <button class="btn btn-ghost btn-sm" data-firmapasif="' + f._id + '">' + (f.pasif ? 'Aktife al' : 'Pasife al') + '</button> <button class="btn btn-danger btn-sm" data-firmasil="' + f._id + '">Sil</button>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
     return h;
   }
@@ -2970,9 +2972,9 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
 
     return '<div class="crumb"><button data-goto="firmalar">Firmalar</button> › ' + esc(f.unvan) + '</div>' +
       '<div class="phead"><div><h1>' + esc(f.unvan) + '</h1>' +
-      '<p class="psub">' + esc(f.faaliyet || '') + ' · ' + esc(f.tehlike || '') + '</p></div>' +
+      '<p class="psub">' + (f.pasif ? '<span class="tag tag-warn">Pasif firma</span> · ' : '') + esc(f.faaliyet || '') + ' · ' + esc(f.tehlike || '') + '</p></div>' +
       '<div class="pact"><button class="btn btn-ghost" id="duzenle">Bilgileri düzenle</button>' +
-      (yonetimiMi() ? '<button class="btn btn-danger" id="firmaSilBtn">Firmayı sil</button>' : '') +
+      (yonetimiMi() ? '<button class="btn btn-ghost" id="firmaPasifBtn">' + (f.pasif ? 'Firmayı aktife al' : 'Firmayı pasife al') + '</button><button class="btn btn-danger" id="firmaSilBtn">Firmayı sil</button>' : '') +
       '<button class="btn btn-ghost" id="egitimEkle">Eğitim planı oluştur</button>' +
       '<button class="btn btn-primary" id="planEkle">Yıllık İSG planı oluştur</button></div></div>' +
 
@@ -3022,6 +3024,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     var f = App.firmalar.find(function (x) { return x._id === id; });
     var d = $('#duzenle'); if (d) d.addEventListener('click', function () { firmaModal(f); });
     var fs = $('#firmaSilBtn'); if (fs) fs.addEventListener('click', function () { firmaSil(f._id); });
+    var fp = $('#firmaPasifBtn'); if (fp) fp.addEventListener('click', function () { firmaPasifDegistir(f._id); });
     ['#planEkle', '#planEkle2'].forEach(function (s) {
       var b = $(s); if (b) b.addEventListener('click', function () { yilSor(id); });
     });
@@ -3035,6 +3038,23 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         imzaliPlanYukle(planId, dosya, function () { render(); });
       });
     });
+  }
+
+  /* Yönetici: firmayı pasife alır / yeniden aktife alır. Firmanın tüm verileri (plan, eğitim, evrak vb.) olduğu gibi kalır. */
+  function firmaPasifDegistir(id) {
+    if (!yonetimiMi()) { toast('Bu işlemi yalnızca yönetici yapabilir', 'err'); return; }
+    var f = App.firmalar.find(function (x) { return x._id === id; }); if (!f) return;
+    var pasifYap = !f.pasif;
+    if (!confirm(pasifYap
+      ? '“' + f.unvan + '” pasife alınsın mı?\n\nYönetici dışındaki kullanıcılar bu firmayı göremez. Firmanın tüm verileri saklanır; istediğinizde yeniden aktife alabilirsiniz.'
+      : '“' + f.unvan + '” yeniden aktife alınsın mı?\n\nAtanmış kullanıcılar firmayı yeniden görebilir.')) return;
+    var d = JSON.parse(JSON.stringify(f)); delete d._id;
+    if (pasifYap) { d.pasif = true; d.pasifTarihi = new Date().toISOString(); } else { delete d.pasif; delete d.pasifTarihi; }
+    d.guncelleme = new Date().toISOString();
+    Store.set('firmalar/' + id, d).then(function () {
+      if (pasifYap) { f.pasif = true; f.pasifTarihi = d.pasifTarihi; } else { delete f.pasif; delete f.pasifTarihi; }
+      toast(pasifYap ? 'Firma pasife alındı' : 'Firma aktife alındı', 'ok'); render();
+    }).catch(function (e) { toast('Kaydedilemedi: ' + (e && e.message || e), 'err'); });
   }
 
   function yilSor(firmaId) {
@@ -6048,7 +6068,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   }
 
   function kullaniciFirmalari(ku) {
-    return App.firmalar.filter(function (f) { return f.uzmanKullanici === ku || f.hekimKullanici === ku; });
+    return App.firmalar.filter(function (f) { return !f.pasif && (f.uzmanKullanici === ku || f.hekimKullanici === ku); });
   }
 
   function ziyaretYukle(yil, kullanici) {
@@ -7263,8 +7283,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   var SG_SORULAR = [['hastane', '3. Hastanede yattınız mı?', 'Tanı'], ['ameliyat', '4. Ameliyat oldunuz mu?', 'Tanı'], ['kaza', '5. İş kazası geçirdiniz mi?', 'Ne oldu?'], ['meslek', '6. Meslek hastalığı şüphesiyle tetkik veya muayeneye tabi tutuldunuz mu?', 'Sonuç'], ['malul', '7. Maluliyet aldınız mı?', 'Nedeni ve oranı'], ['tedavi', '8. Şu anda herhangi bir tedavi görüyor musunuz?', 'Nedir?']];
   var SG_AYLAR_YIL = { cok: 1, te: 3, az: 5 };
 
-  function sgErisim() { return !!App.kullanici && (yonetimiMi() || App.firmalar.some(function (f) { return f.hekimKullanici === App.kullanici.kullanici; })); }
-  function sgFirmalar() { return yonetimiMi() ? App.firmalar : App.firmalar.filter(function (f) { return f.hekimKullanici === App.kullanici.kullanici; }); }
+  function sgErisim() { return !!App.kullanici && (yonetimiMi() || App.firmalar.some(function (f) { return !f.pasif && f.hekimKullanici === App.kullanici.kullanici; })); }
+  function sgFirmalar() { return App.firmalar.filter(function (f) { return !f.pasif && (yonetimiMi() || f.hekimKullanici === App.kullanici.kullanici); }); }
   function sgGorunur(r) { return yonetimiMi() || r.olusturan === App.kullanici.kullanici || sgFirmalar().some(function (f) { return f._id === r.firmaId; }); }
   function sgSinif(t) { var n = foNorm(t); return n.indexOf('cok') === 0 ? 'cok' : n.indexOf('az') === 0 ? 'az' : 'te'; }
   function sgIsoEkle(iso, y) { var p = String(iso).split('-'), d = new Date(+p[0] + y, +p[1] - 1, +p[2]); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -7694,7 +7714,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   function evrakTurAdi(v) { var t = EVRAK_TURLERI.find(function (x) { return x.v === v; }); return t ? t.l : v; }
   function evrakListe(firmaId, tur) { return App.evrak.filter(function (d) { return d.firmaId === firmaId && d.tur === tur; }); }
   function evrakFirmalari() {
-    var l = yonetimiMi() ? (App.evrakKul ? kullaniciFirmalari(App.evrakKul) : App.firmalar) : benimFirmalarim();
+    var l = yonetimiMi() ? (App.evrakKul ? kullaniciFirmalari(App.evrakKul) : App.firmalar.filter(function (f) { return !f.pasif; })) : benimFirmalarim();
     return l.slice().sort(function (a, b) { return firmaKisa(a).localeCompare(firmaKisa(b), 'tr'); });
   }
 
@@ -7930,6 +7950,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       }).catch(function (err) { toast('Silinemedi: ' + (err && err.message || err), 'err'); });
       return;
     }
+    var fpl = e.target.closest('[data-firmapasif]');
+    if (fpl) { firmaPasifDegistir(fpl.getAttribute('data-firmapasif')); return; }
     var fsl = e.target.closest('[data-firmasil]');
     if (fsl) { firmaSil(fsl.getAttribute('data-firmasil')); return; }
     var yf = e.target.closest('#yeniFirma,#yeniFirma2');
@@ -7952,7 +7974,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     document.body.innerHTML = '<div class="boot"><div class="spin" style="border-color:rgba(0,0,0,.15);border-top-color:var(--red)"></div><span>Kayıtlar yükleniyor…</span></div>';
     Promise.all([Store.list('firmalar'), Store.list('planlar'), Store.list('users'), Store.list('egitimplani'), Store.list('egitimoturum'), Store.list('egitimgecmis'), Store.list('kutuphane'), Store.list('evrak'), Store.list('tehlike'), Store.get('app/th_faaliyet')])
       .then(function (r) {
-        App.firmalar = r[0]; App.planlar = r[1].map(planTamamla); App.kullanicilar = r[2];
+        App.firmalar = yonetimiMi() ? r[0] : r[0].filter(function (f) { return !f.pasif; });   // pasif firmalar yalnızca yöneticiye görünür
+        App.planlar = r[1].map(planTamamla); App.kullanicilar = r[2];
         App.egitimPlanlari = r[3].map(egitimPlaniTamamla);
         App.oturumlar = r[4]; App.gecmis = r[5]; App.kutuphane = r[6] || []; App.kut = { tur: 'planlar' }; App.evrak = r[7] || []; App.evrakKul = ''; App.tehlike = r[8] || []; App.thFaaliyet = (r[9] && r[9].liste) || []; thKuyruk.calisiyor = false; thKuyruk.dur = false; thKuyruk.mesaj = ''; thUI.yeni = []; thUI.foto = {}; thUI.duzenliyor = false; thUI.liste = { firma: '', durum: '' }; thUI.filtre = '';
         App.liste = { firma: 'tum', kfirma: 'tum', sekme: 'liste', ara: '' };

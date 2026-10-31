@@ -3456,6 +3456,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     return foZipOku(egB64Bayt(TEMEL_TUTANAK_B64)).then(function (dosyalar) {
       var B = adAc(dosyalar), doc = B.doc, T = B.bl, logo = f && f.logo && f.logo.veri ? f.logo : null, tcL = foLogoAday(doc, false);
       if (logo && foLogoKoy(doc, f, false)) egLogoPaketle(dosyalar, logo); else if (tcL) adHucreYaz(tcL, unvan);
+      tutanakUnvanEkle(doc, unvan);
       /* eğitim bilgileri */
       var t3 = adTrler(T[3]), yaz = function (tr, i, v) { var h = foHucreler(tr); if (v) foHucreYaz(h[i], v, h[i - 1]); };
       if (o._egitmenListesi && o._egitmenListesi.length) {
@@ -3524,6 +3525,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var B = adAc(dosyalar), doc = B.doc, bl = B.bl, logo = f && f.logo && f.logo.veri ? f.logo : null;
       var tcL = foLogoAday(doc, false);
       if (logo && foLogoKoy(doc, f, false)) egLogoPaketle(dosyalar, logo); else if (tcL) adHucreYaz(tcL, unvan);
+      tutanakUnvanEkle(doc, unvan);
       var t3 = adTrler(bl[3]), egt = String(o.uzmanAdi || '').trim(), un = String(o.uzmanUnvan || '').trim();
       var yaz = function (tr, i, v) { var h = foHucreler(tr); foHucreYaz(h[i], v, h[i - 1]); };
       yaz(t3[0], 1, egt + (egt && un ? ' - ' : '') + un); adSil(t3[1]);
@@ -6645,6 +6647,67 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     return null;
   }
   function foHucreler(tr) { return Array.prototype.filter.call(tr.childNodes, function (c) { return c.nodeType === 1 && c.localName === 'tc'; }); }
+
+  /* Tutanak başlığı: "İŞ SAĞLIĞI VE GÜVENLİĞİ" satırının üstüne firma ünvanı satırı ekler.
+     Yazı boyutu "İŞ SAĞLIĞI VE GÜVENLİĞİ" ile aynı, rengi "EĞİTİM KATILIM TUTANAĞI" ile aynıdır.
+     Ünvan tek satıra sığmayacak kadar uzunsa, sayfa taşmasın diye yazı yalnızca gerektiği kadar küçültülür (en az 7 pt). */
+  function tutanakUnvanEkle(doc, unvan) {
+    unvan = String(unvan || '').replace(/\s+/g, ' ').trim();
+    if (!unvan) return false;
+    var hedef = null, ps = foWel(doc, 'p');
+    for (var i = 0; i < ps.length && !hedef; i++) {
+      var n = foNorm(foMetin(ps[i]));
+      if (n.indexOf('issagligivegu') >= 0 && n.length < 90) hedef = ps[i];
+    }
+    /* şablonda "İŞ SAĞLIĞI VE GÜVENLİĞİ" satırı yoksa, tutanağın başlık satırı esas alınır */
+    for (var k2 = 0; k2 < ps.length && !hedef; k2++) {
+      var n2 = foNorm(foMetin(ps[k2]));
+      if (n2.indexOf('katilimtutanagi') >= 0 && n2.length < 90) hedef = ps[k2];
+    }
+    if (!hedef) return false;
+    var renk = '', runs = foWel(doc, 'r');
+    for (var j = 0; j < runs.length && !renk; j++) {
+      if (foNorm(foMetin(runs[j])).indexOf('egitimkatilim') < 0) continue;
+      var rp0 = foCocuk(runs[j], 'rPr'), c0 = rp0 && foCocuk(rp0, 'color');
+      if (c0) renk = c0.getAttributeNS(WNS, 'val') || '';
+    }
+    var kaynakRun = foWel(hedef, 'r').filter(function (r) { return foWel(r, 't').length; })[0];
+    var np = hedef.cloneNode(true);
+    ['w14:paraId', 'w14:textId'].forEach(function (a) { if (np.hasAttribute(a)) np.removeAttribute(a); });
+    Array.prototype.slice.call(np.childNodes).forEach(function (c) { if (!(c.nodeType === 1 && c.localName === 'pPr' && c.namespaceURI === WNS)) np.removeChild(c); });
+    var pPr = foCocuk(np, 'pPr');
+    if (pPr) {
+      var sp = foCocuk(pPr, 'spacing'); if (sp) { sp.setAttributeNS(WNS, 'w:after', '0'); sp.setAttributeNS(WNS, 'w:before', '0'); }
+      ['pageBreakBefore', 'keepNext'].forEach(function (k) { var e = foCocuk(pPr, k); if (e) pPr.removeChild(e); });
+    }
+    var r = doc.createElementNS(WNS, 'w:r'), rp = kaynakRun && foCocuk(kaynakRun, 'rPr') ? foCocuk(kaynakRun, 'rPr').cloneNode(true) : doc.createElementNS(WNS, 'w:rPr');
+    if (renk) {
+      var ce = foCocuk(rp, 'color');
+      if (!ce) {
+        ce = doc.createElementNS(WNS, 'w:color');
+        var once = foCocuk(rp, 'sz') || foCocuk(rp, 'szCs') || foCocuk(rp, 'u') || null;
+        if (once) rp.insertBefore(ce, once); else rp.appendChild(ce);
+      }
+      ce.setAttributeNS(WNS, 'w:val', renk);
+    }
+    /* sığma denetimi: hücre genişliği (dxa) ve yazı boyutuna göre */
+    var tc = hedef.parentNode, genis = 5606;
+    if (tc && tc.localName === 'tc') { var tp = foCocuk(tc, 'tcPr'), tw = tp && foCocuk(tp, 'tcW'); if (tw && tw.getAttributeNS(WNS, 'type') !== 'pct') genis = parseInt(tw.getAttributeNS(WNS, 'w'), 10) || genis; }
+    var szE = foCocuk(rp, 'sz'), yp = (szE ? parseInt(szE.getAttributeNS(WNS, 'val'), 10) : 18) / 2;
+    var kullanilabilir = (genis - 260) / 20, gereken = unvan.length * 0.64 * yp;
+    if (gereken > kullanilabilir) {
+      var yeni = Math.max(7, Math.floor((kullanilabilir / (unvan.length * 0.64)) * 2) / 2), hv = String(Math.round(yeni * 2));
+      ['sz', 'szCs'].forEach(function (k) {
+        var e = foCocuk(rp, k); if (!e) { e = doc.createElementNS(WNS, 'w:' + k); rp.appendChild(e); }
+        e.setAttributeNS(WNS, 'w:val', hv);
+      });
+    }
+    r.appendChild(rp);
+    var t = doc.createElementNS(WNS, 'w:t'); t.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve'); t.textContent = unvan; r.appendChild(t);
+    np.appendChild(r);
+    hedef.parentNode.insertBefore(np, hedef);
+    return true;
+  }
   var FO_FILLER = /^[\s._\-–—…·:]*$/;
 
   /* paragrafın [bas,son) metin aralığını yeni metinle değiştirir (run biçimleri korunur) */
@@ -6801,12 +6864,14 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var dec = new TextDecoder('utf-8'), enc = new TextEncoder(), vals = foDegerler(f), say = { alan: 0, logo: false }, relli = [];
       var dn = foNorm((d.ad || '') + ' ' + (d.dosyaAdi || '')), ctx = { genel: dn.indexOf('hekimkanaat') >= 0 ? 'hekim' : '', adsoyadYok: dn.indexOf('gorevlendirme') >= 0 };
       var png = f.logo && f.logo.mime === 'image/png', uz = png ? 'png' : 'jpeg';
+      var tutanakMi = dn.indexOf('egitimkatilimtutanagi') >= 0 || dn.indexOf('egitimkatilim') >= 0 && dn.indexOf('tutanak') >= 0;
       var partlar = dosyalar.filter(function (p) { return /^word\/(document|header\d*|footer\d*)\.xml$/.test(p.name); })
         .sort(function (a, b) { return (/header/.test(b.name) ? 1 : 0) - (/header/.test(a.name) ? 1 : 0); });
       partlar.forEach(function (pr) {
         var doc = new DOMParser().parseFromString(dec.decode(pr.data), 'application/xml');
         if (doc.getElementsByTagName('parsererror').length) return;
         foDoldur(doc, vals, say, ctx);
+        if (tutanakMi && !say.unvan && f.unvan && tutanakUnvanEkle(doc, f.unvan)) say.unvan = true;
         var baslik = /header/.test(pr.name);
         if (!say.logo && f.logo && (baslik || /document/.test(pr.name)) && foLogoKoy(doc, f, baslik)) { say.logo = true; relli.push(pr.name); }
         var s = new XMLSerializer().serializeToString(doc);

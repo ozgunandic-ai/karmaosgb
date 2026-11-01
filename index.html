@@ -2975,8 +2975,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '<p class="psub">' + (f.pasif ? '<span class="tag tag-warn">Pasif firma</span> · ' : '') + esc(f.faaliyet || '') + ' · ' + esc(f.tehlike || '') + '</p></div>' +
       '<div class="pact"><button class="btn btn-ghost" id="duzenle">Bilgileri düzenle</button>' +
       (yonetimiMi() ? '<button class="btn btn-ghost" id="firmaPasifBtn">' + (f.pasif ? 'Firmayı aktife al' : 'Firmayı pasife al') + '</button><button class="btn btn-danger" id="firmaSilBtn">Firmayı sil</button>' : '') +
-      '<button class="btn btn-ghost" id="egitimEkle">Eğitim planı oluştur</button>' +
-      '<button class="btn btn-primary" id="planEkle">Yıllık İSG planı oluştur</button></div></div>' +
+      '</div></div>' +
 
       '<div class="card"><div class="card-h"><h2>Firma giriş bilgileri</h2>' +
       '<span class="ch-sub">Belgelerin başlık alanlarına bu bilgiler yazılır</span></div>' +
@@ -2989,19 +2988,15 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
 
       '<div class="card"><div class="card-h"><h2>Yıllık İSG planları</h2></div>' +
       (planlar.length ?
-        '<div class="card-b tight"><table class="tbl"><thead><tr><th>Yıl</th><th class="opt">Kurul durumu</th><th>İmzalı plan</th><th class="opt">Son güncelleme</th><th></th></tr></thead><tbody>' +
+        '<div class="card-b tight"><table class="tbl"><thead><tr><th>Yıl</th><th class="opt">Kurul durumu</th><th class="opt">Son güncelleme</th><th></th></tr></thead><tbody>' +
         planlar.map(function (p) {
           return '<tr><td><strong>' + esc(p.yil) + '</strong></td>' +
             '<td class="opt">' + (p.altmis === 'evet' ? '<span class="tag">Kurul zorunlu değil</span>' : '<span class="tag tag-red">Kurul var · ' + esc(periyotAdi(p.kurulPeriyot)) + '</span>') + '</td>' +
-            '<td>' + imzaliPlanEtiket(p) + '</td>' +
             '<td class="opt">' + esc(trTarih((p.guncelleme || '').slice(0, 10))) + '</td>' +
-            '<td class="cell-act"><label class="btn btn-ghost btn-sm" style="cursor:pointer">' + (p.imzaliPlan ? 'Değiştir' : 'Yükle') +
-            '<input type="file" accept="application/pdf" style="display:none" data-pdfyukle="' + p._id + '"></label> ' +
-            '<button class="btn btn-ghost btn-sm" data-plan="' + p._id + '">Aç</button> ' +
+            '<td class="cell-act"><button class="btn btn-ghost btn-sm" data-plan="' + p._id + '">Aç</button> ' +
             (kayitSilebilirMi(p.olusturan) ? '<button class="btn btn-danger btn-sm" data-plansil="' + p._id + '">Sil</button>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div>'
-        : '<div class="empty"><h3>Bu firma için plan yok</h3><p>Planın hangi yıl için hazırlanacağını seçerek başlayın.</p>' +
-        '<button class="btn btn-primary" id="planEkle2">Yıllık İSG planı oluştur</button></div>') +
+        : '<div class="empty"><h3>Bu firma için plan yok</h3><p>Plan, soldaki “Yıllık İSG Planları” menüsünden hazırlanır.</p></div>') +
       '</div>' +
 
       '<div class="card"><div class="card-h"><h2>Eğitim planları</h2></div>' +
@@ -3014,8 +3009,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
             '<td class="cell-act"><button class="btn btn-ghost btn-sm" data-egitim="' + p._id + '">Aç</button> ' +
             (kayitSilebilirMi(p.olusturan) ? '<button class="btn btn-danger btn-sm" data-egitimsil="' + p._id + '">Sil</button>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div>'
-        : '<div class="empty"><h3>Bu firma için eğitim planı yok</h3><p>Yıllık eğitim planını hangi yıl için hazırlayacağınızı seçerek başlayın.</p>' +
-        '<button class="btn btn-ghost" id="egitimEkle2">Eğitim planı oluştur</button></div>') +
+        : '<div class="empty"><h3>Bu firma için eğitim planı yok</h3><p>Eğitim planı, soldaki “Yıllık Eğitim Planları” menüsünden hazırlanır.</p></div>') +
       '</div>';
   }
 
@@ -3025,19 +3019,6 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     var d = $('#duzenle'); if (d) d.addEventListener('click', function () { firmaModal(f); });
     var fs = $('#firmaSilBtn'); if (fs) fs.addEventListener('click', function () { firmaSil(f._id); });
     var fp = $('#firmaPasifBtn'); if (fp) fp.addEventListener('click', function () { firmaPasifDegistir(f._id); });
-    ['#planEkle', '#planEkle2'].forEach(function (s) {
-      var b = $(s); if (b) b.addEventListener('click', function () { yilSor(id); });
-    });
-    ['#egitimEkle', '#egitimEkle2'].forEach(function (s) {
-      var b = $(s); if (b) b.addEventListener('click', function () { egitimYilSor(id); });
-    });
-    $$('[data-pdfyukle]').forEach(function (inp) {
-      inp.addEventListener('change', function () {
-        var dosya = inp.files[0]; if (!dosya) return;
-        var planId = inp.getAttribute('data-pdfyukle');
-        imzaliPlanYukle(planId, dosya, function () { render(); });
-      });
-    });
   }
 
   /* Yönetici: firmayı pasife alır / yeniden aktife alır. Firmanın tüm verileri (plan, eğitim, evrak vb.) olduğu gibi kalır. */
@@ -4865,13 +4846,12 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     }
     h += firmaAraKutusu('plan', 'Plan ara: firma ünvanı, kısaltma, yıl…');
     h += '<div class="card"><div class="card-b tight"><table class="tbl"><thead><tr>' +
-      '<th>Yıl</th><th>İşyeri</th><th class="opt">İSG kurulu</th><th>İmzalı plan</th><th class="opt">Son güncelleme</th><th></th></tr></thead><tbody>' +
+      '<th>Yıl</th><th>İşyeri</th><th class="opt">İSG kurulu</th><th class="opt">Son güncelleme</th><th></th></tr></thead><tbody>' +
       list.map(function (p) {
         var f = App.firmalar.find(function (x) { return x._id === p.firmaId; }) || {};
         return '<tr data-ara="' + esc(trNorm([f.unvan, f.kisaAd, f.isveren, f.uzman, f.hekim, f.tehlike, p.yil].join(' '))) + '"><td><strong>' + esc(p.yil) + '</strong></td>' +
           '<td><button class="row-link" data-plan="' + p._id + '" style="background:none;border:none;padding:0;text-align:left">' + esc(f.unvan || '(silinmiş firma)') + '</button>' + firmaKisaSatir(f) + '</td>' +
           '<td class="opt">' + (p.altmis === 'evet' ? '<span class="tag">Zorunlu değil</span>' : '<span class="tag tag-red">' + esc(periyotAdi(p.kurulPeriyot)) + '</span>') + '</td>' +
-          '<td>' + imzaliPlanEtiket(p) + '</td>' +
           '<td class="opt">' + esc(trTarih((p.guncelleme || '').slice(0, 10))) + '</td>' +
           '<td class="cell-act"><button class="btn btn-ghost btn-sm" data-plan="' + p._id + '">Aç</button></td></tr>';
       }).join('') + '</tbody></table></div></div>';
@@ -4910,7 +4890,6 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '<button data-goto="firma" data-id="' + esc(p.firmaId) + '">' + esc(f.unvan || 'Firma') + '</button> › ' + esc(p.yil) + ' planı</div>' +
       '<div class="phead"><div><h1>' + esc(p.yil) + ' Yıllık İSG Çalışma Planı</h1>' +
       '<p class="psub">' + esc(f.unvan || '') + ' · ' + esc(f.tehlike || '') + ' · İSG uzmanı: ' + esc(f.uzman || '—') + '</p></div></div>' +
-      imzaliPlanKarti(p) +
       '<div class="plan"><div class="plan-idx">' + idx + '</div><div class="plan-body" id="planBody"></div></div>' +
       '<div class="savebar"><span class="sb-info" id="sbInfo">Tüm değişiklikler kaydedilmeye hazır</span>' +
       '<span class="sb-space"></span>' +
@@ -4934,7 +4913,6 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       planKaydet(false).catch(function () { /* hata zaten toast ile gösterildi */ });
     });
     $('#btnOnizle').addEventListener('click', onizle);
-    bindImzaliPlanKarti(p);
   }
 
   function imzaliPlanKarti(p) {
@@ -5191,11 +5169,12 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       return '<option value="' + i + '"' + (+v === i ? ' selected' : '') + '>' + i + '. hafta</option>';
     }).join('') + '</select>';
   }
-  function tarihGirisHtml(key, iso) {
+  function tarihGirisHtml(key, iso, gunOpt) {
     var g = '', a = '', y = '';
     if (iso) {
       var parc = String(iso).split('-');
       if (parc.length === 3) { y = String(+parc[0]); a = String(+parc[1] - 1); g = String(+parc[2]); }
+      else if (gunOpt && parc.length === 2) { y = String(+parc[0]); a = String(+parc[1] - 1); }
     }
     var gunOpts = '<option value="">Gün</option>';
     for (var d = 1; d <= 31; d++) gunOpts += '<option value="' + d + '"' + (g === String(d) ? ' selected' : '') + '>' + d + '</option>';
@@ -5204,7 +5183,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     }).join('');
     var simdikiYil = new Date().getFullYear(), yilOpts = '<option value="">Yıl</option>';
     for (var yy = simdikiYil - 8; yy <= 2050; yy++) yilOpts += '<option value="' + yy + '"' + (y === String(yy) ? ' selected' : '') + '>' + yy + '</option>';
-    return '<div class="tarih3" data-hedef="' + esc(key) + '">' +
+    return '<div class="tarih3" data-hedef="' + esc(key) + '"' + (gunOpt ? ' data-gunopt="1"' : '') + '>' +
       '<select data-td="g" aria-label="Gün">' + gunOpts + '</select>' +
       '<select data-td="a" aria-label="Ay">' + ayOpts + '</select>' +
       '<select data-td="y" aria-label="Yıl">' + yilOpts + '</select>' +
@@ -5223,6 +5202,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         if (+g > sonGun) { g = String(sonGun); kutu.querySelector('[data-td="g"]').value = g; }
       }
       var iso = (g && a !== '' && y) ? (y + '-' + ('0' + (+a + 1)).slice(-2) + '-' + ('0' + g).slice(-2)) : '';
+      // gün isteğe bağlı alanlarda yalnızca ay ve yıl da yeterlidir (YYYY-AA)
+      if (!iso && kutu.getAttribute('data-gunopt') && a !== '' && y) iso = y + '-' + ('0' + (+a + 1)).slice(-2);
       var oncekiDoluMuydu = !!hid.value;
       hid.value = iso;
       // Tarih tamamlanana kadar (ya da önceden dolu bir tarih temizleniyorsa) durum
@@ -5275,19 +5256,11 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
 
     if (p.kurulIlkKez === 'evet') {
       h += '<div class="q"><div class="inline">' +
-        '<div class="field" style="max-width:190px"><label>Kurul atama tarihi</label>' +
-        tarihGirisHtml('kurulAtamaTarihi', p.kurulAtamaTarihi) + '</div>' +
-        (p.kurulAtamaTarihi ? '<div class="hint" style="margin:0 0 9px">' + AYLAR[ayOf(p.kurulAtamaTarihi)] + ' ' + haftaOf(p.kurulAtamaTarihi) + '. hafta işaretlenecek</div>' : '') +
+        '<div class="field" style="max-width:360px"><label>Kurul atama tarihi</label>' +
+        tarihGirisHtml('kurulAtamaTarihi', p.kurulAtamaTarihi, true) + '</div>' +
+        (p.kurulAtamaTarihi ? '<div class="hint" style="margin:0 0 9px">' + AYLAR[ayOf(p.kurulAtamaTarihi)] + (String(p.kurulAtamaTarihi).split('-').length === 3 ? ' ' + haftaOf(p.kurulAtamaTarihi) + '. hafta' : ' ayının 1. haftası') + ' işaretlenecek</div>' : '') +
         '</div></div>' +
-        '<div class="q"><div class="qt">Kurul üyeleri</div><div id="uyeler">' +
-        p.kurulUyeleri.map(function (u, i) {
-          return '<div class="memberrow"><input type="text" data-uye-rol="' + i + '" value="' + esc(u.rol) + '" placeholder="Görev">' +
-            '<input type="text" data-uye-ad="' + i + '" value="' + esc(u.ad) + '" placeholder="Ad soyad">' +
-            '<button class="btn btn-quiet" data-uye-sil="' + i + '" aria-label="Satırı sil">✕</button></div>';
-        }).join('') + '</div>' +
-        '<div class="gtools"><button class="btn btn-ghost btn-sm" id="uyeEkle">Üye ekle</button>' +
-        '<button class="btn btn-dark btn-sm" id="btnKurulWord">Kurul Atama Yazısını indir (Word)</button></div>' +
-        '<p class="hint">Word belgesi firma ünvanı, atama tarihi ve yukarıdaki üye listesiyle üretilir.</p></div>';
+        '<p class="hint">Kesin tarihi (gün, ay, yıl) girebilir ya da gün seçmeden yalnızca <b>ay ve yılı</b> girebilirsiniz. Kesin tarihte ilgili haftaya, yalnızca ay girilirse o ayın 1. haftasına işlenir.</p>';
     } else if (p.kurulIlkKez === 'hayir') {
       h += '<div class="notebox">Kurul daha önce oluşturulmuş. Bu satır boş bırakılacak; isterseniz aşağıdan hafta işaretleyebilirsiniz.</div>' +
         gridHtml('k_olusturma_manuel', p.faaliyetler.k_olusturma_manuel ? p.faaliyetler.k_olusturma_manuel.secili : bos48());
@@ -5521,8 +5494,6 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     });
     var ue = $('#uyeEkle', body);
     if (ue) ue.addEventListener('click', function () { p.kurulUyeleri.push({ rol: '', ad: '' }); kirlet(); bolumCiz(); });
-    var kw = $('#btnKurulWord', body);
-    if (kw) kw.addEventListener('click', kurulWordIndir);
   }
 
   /* ==========================================================================
@@ -5599,18 +5570,6 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     dosyaVer(p.yil + '_' + slug(f.unvan) + '_ISG_Yillik_Calisma_Plani.xlsx', bytes);
   }
 
-  function kurulWordIndir() {
-    var p = App.plan, f = App.planFirma;
-    if (!p.kurulAtamaTarihi) { toast('Önce kurul atama tarihini girin', 'err'); return; }
-    var bytes = window.KarmaGen.buildKurulAtamaDocx({
-      unvan: f.unvan, tarih: trTarih(p.kurulAtamaTarihi),
-      yayinTarihi: trTarih(p.kurulAtamaTarihi), revizyonNo: '00', revizyonTarihi: '-',
-      kurulPeriyot: periyotAdi(p.kurulPeriyot).toLocaleLowerCase('tr'),
-      hazirlayan: 'İSG BİRİMİ', sorumlu: (f.uzman || 'İŞ GÜVENLİĞİ UZMANI'), isveren: (f.isveren || 'İŞVEREN'),
-      uyeler: p.kurulUyeleri.filter(function (u) { return u.rol || u.ad; })
-    }, LOGO_BYTES);
-    dosyaVer(slug(f.unvan) + '_ISG_Kurulu_Atama_Yazisi.docx', bytes);
-  }
 
   /* ---- imzalı plan (taranmış PDF) yükleme/görüntüleme ---- */
   var PDF_MAX = 8 * 1024 * 1024; // 8 MB

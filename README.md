@@ -1,2 +1,135 @@
-# karmaosgb
-KARMA OSGB Doküman Yönetimi
+# OSGB 360 (karmacrm)
+
+OSGB işletmesi için CRM, teklif, sözleşme, hizmet süresi ve kârlılık yazılımı.
+Tek işletme için çalışır; veri modeli ileride SaaS'a geçişe hazırdır (her tabloda `organization_id`).
+
+> Bu yazılım **yönetim amaçlı analiz** yapar. Resmî muhasebe, vergi beyannamesi veya mevzuat hesabı yerine geçmez.
+> Hizmet süresi parametreleri işletme sahibinin tanımladığı değerlerdir; güncel mevzuata uygunluğu ayrıca doğrulanmalıdır.
+
+## Durum
+
+| Aşama | Konu | Durum |
+|---|---|---|
+| 1 | Mimari, veri modeli, hesaplama motoru | Tamam, onaylandı |
+| 2 | Giriş, roller, firma kartları, kişiler | Tamam, onaylandı |
+| 3 | CRM, potansiyel müşteri, satış fırsatları, görüşmeler, görevler | Tamam |
+| 4 | Teklifler (canlı kârlılık), sözleşmeler, fiyat geçmişi, yenileme uyarıları | Tamam |
+| 5 | Uzman/hekim kayıtları, görevlendirme payları, zaman takibi, kapasite analizi | **Tamam, onayınızı bekliyor** |
+| 6–10 | Gelir/gider, kârlılık, panel, yapay zekâ, yayın | Planlandı |
+
+## Mimari
+
+| Katman | Seçim |
+|---|---|
+| Arayüz | Düz HTML + CSS + JavaScript (ES modülleri), Türkçe, derleme adımı yok |
+| Yayın | GitHub Pages (yalnızca statik dosya) |
+| Veri tabanı | Supabase PostgreSQL |
+| Giriş | Supabase Auth (kayıt kapalı, kullanıcıları işletme sahibi ekler) |
+| Yetki | Row Level Security: kurallar veri tabanındadır, butonları gizlemek güvenlik sayılmaz |
+| Gizli işlemler | Supabase Edge Functions (günlük özet e-postası — Aşama 10; yapay zekâ anahtarı, SMS sonraki aşamalar) |
+
+## Klasörler
+
+```
+karmacrm/
+├─ index.html                Uygulama girişi (CSP burada)
+├─ supabase/
+│  ├─ 01_sema.sql            Tablolar, RLS, denetim, tarihçe kısıtları (33 tablo)
+│  ├─ 02_ilk_kurulum.sql     İlk kurum + ilk kullanıcı (bir kez)
+│  ├─ 03_asama2.sql          Aşama 2 fonksiyonları ve korumaları (bir kez)
+│  ├─ 04_asama3.sql          Aşama 3: CRM, fırsat, görev fonksiyonları (bir kez)
+│  ├─ 05_asama4.sql          Aşama 4: teklif, sözleşme kuralları ve fonksiyonları (bir kez)
+│  ├─ 06_asama5.sql          Aşama 5: personel, görevlendirme, zaman kaydı kuralları (bir kez)
+│  ├─ 07_asama6.sql          Aşama 6: fatura, tahsilat, gider kuralları ve fonksiyonları (bir kez)
+│  ├─ 08_asama7.sql          Aşama 7: kârlılık girdileri, ortak gider dağıtımı ve ölçüt fonksiyonları (bir kez)
+│  ├─ 09_asama9.sql          Aşama 9: sistem ayarları (ayar_kaydet, hizmet_suresi_kurali_ekle) (bir kez)
+│  ├─ 10_asama10.sql         Aşama 10: günlük özet (email_digest_log, gunluk_ozet) (bir kez)
+│  ├─ 11_asama11.sql         Aşama 11: denetim kaydı okuma izni, tam yetki, yedek kaydı (bir kez)
+│  ├─ 12_asama12.sql         Aşama 12: müşteri teklif bağlantısı (offer_shares, girişsiz müşteri fonksiyonları) (bir kez)
+│  ├─ 14_asama13_katip.sql   Aşama 13: İSG-Katip aktarımı (company_sites, katip_imports/rows/people, katip_uygula) (bir kez)
+│  ├─ 24_asama22.sql         Aşama 22: firma dışı spot işler (firmasız gelir kalemi)
+│  ├─ 23_asama21.sql         Aşama 21: İdari İşler (izin, araç, belgeler, depolama kovası), yıllık takvim tekrarı (bir kez)
+│  ├─ 22_asama20.sql         Aşama 20: personel bazlı maliyet (net/brüt/emekli/SGK/elden, dönemler) (bir kez)
+│  ├─ 21_toplu_tahsilat_tek_sefer.sql  Tek seferlik: listedekiler dışındaki EAR-/EFT- faturaları tahsil edildi işaretler (bir kez)
+│  ├─ 20_asama19.sql         Aşama 19: aylık gider Excel aktarımı (gider_aktar, yönetime ödenen kategorisi, eşleşme hafızası) (bir kez)
+│  ├─ 19_asama18.sql         Aşama 18: firmayı kalıcı silme (firma_sil), pasif firmaya toplu fatura üretmeme (bir kez)
+│  ├─ 18_asama17.sql         Aşama 17: gelir Excel aktarımı, spot/elden gelir, fatura takma adları (bir kez)
+│  ├─ 17_asama16.sql         Aşama 16: elle işyeri, Takvim, günlük özette Bugün/Yaklaşan (bir kez)
+│  ├─ 16_asama15.sql         Aşama 15: personel rolleri, yönetim gideri, işyeri takma adı (bir kez)
+│  ├─ 15_asama14.sql         Aşama 14: Katip görevlendirme aktarımı (employees.certificate_no, katip_gorevlendir) (bir kez)
+│  ├─ 13_asama13.sql         Aşama 12.1: müşteri yanıtında sahibe e-posta bildirimi (pg_net ile Edge Function'a) (bir kez)
+│  └─ functions/gunluk-ozet/index.ts   Günlük özet e-postası Edge Function'ı (yalnızca sahibe)
+├─ src/
+│  ├─ main.js                Açılış, oturum, yönlendirme
+│  ├─ config.js              Supabase adresi ve anon anahtarı (gizli değildir)
+│  ├─ modules.js             Menü ve modül tanımları
+│  ├─ lib/                   api.js (Supabase), hesaplama.js, ticari.js, operasyon.js, finans.js, karlilik.js, csv.js, aktarim.js, gelir.js, xlsx.js, xlsxyaz.js, ayarlar.js, denetim.js, yedek.js, musteri.js, format.js, veri.js, router.js
+│  ├─ pages/                 auth, panel, firmalar, firma, kisiler, kullanicilar, crm, firsatlar, gorevler, gorusmeler, teklifler, sozlesmeler, personel, gorevlendirmeler, zaman, kapasite, faturalar, giderler, karlilik, raporlar, aktarim, ayarlar, denetim, yedek, musteri-teklif, placeholder
+│  ├─ ui/                    components.js, shell.js (kenar menü/üst çubuk/arama), icons.js, indir.js (CSV indirme)
+│  └─ styles/                tokens.css, app.css
+├─ tests/
+│  ├─ hesaplama.test.js, puanlama, operasyon, finans, karlilik, csv, aktarim, ayarlar, ozet, denetim, yedek, musteri .test.js   Motor ve CSV testleri (Node)
+│  ├─ db_tests.sql, db_tests_asama2.sql, db_tests_asama3.sql, db_tests_asama4.sql, db_tests_asama5.sql, db_tests_asama6.sql, db_tests_asama7.sql, db_tests_asama9.sql, db_tests_asama10.sql, db_tests_asama11.sql, db_tests_asama12.sql, db_tests_asama13.sql, db_tests_asama14.sql   Veri tabanı testleri (PostgreSQL)
+│  ├─ ui/                    Arayüz testleri (Playwright + sahte Supabase istemcisi)
+│  ├─ supabase_stub.sql      Yalnızca yerel test için Supabase taklidi
+│  └─ db_test_cikti*.txt     Son DB test çıktıları
+└─ docs/                     Kurulum, yayın, yetki matrisi, veri modeli
+```
+
+## Testleri çalıştırma
+
+Motor testleri (Node 18+):
+
+```
+npm test
+```
+
+Veri tabanı testleri yerel bir PostgreSQL 16 gerektirir (Supabase'e dokunmaz):
+
+```
+psql -d osgb -f tests/supabase_stub.sql
+psql -d osgb -f supabase/01_sema.sql
+psql -d osgb -f supabase/03_asama2.sql
+psql -d osgb -f supabase/04_asama3.sql
+psql -d osgb -f supabase/05_asama4.sql
+psql -d osgb -f supabase/06_asama5.sql
+psql -d osgb -f supabase/07_asama6.sql
+psql -d osgb -f supabase/08_asama7.sql
+psql -d osgb -f supabase/09_asama9.sql
+psql -d osgb -f supabase/10_asama10.sql
+psql -d osgb -f supabase/11_asama11.sql
+psql -d osgb -f supabase/12_asama12.sql
+psql -d osgb -f supabase/13_asama13.sql
+psql -d osgb -f supabase/14_asama13_katip.sql
+psql -d osgb -f supabase/15_asama14.sql
+psql -d osgb -f supabase/16_asama15.sql
+psql -d osgb -f supabase/17_asama16.sql
+psql -d osgb -f supabase/18_asama17.sql
+psql -d osgb -f supabase/19_asama18.sql
+psql -d osgb -f supabase/20_asama19.sql
+psql -d osgb -f supabase/22_asama20.sql
+psql -d osgb -f tests/db_tests_asama7.sql
+psql -d osgb -f tests/db_tests_asama9.sql
+psql -d osgb -f tests/db_tests_asama10.sql
+psql -d osgb -f tests/db_tests_asama11.sql
+psql -d osgb -f tests/db_tests_asama12.sql
+psql -d osgb -f tests/db_tests_asama13.sql
+psql -d osgb -f tests/db_tests_asama14.sql
+psql -d osgb -f tests/db_tests.sql
+psql -d osgb -f tests/db_tests_asama2.sql
+psql -d osgb -f tests/db_tests_asama3.sql
+psql -d osgb -f tests/db_tests_asama4.sql
+psql -d osgb -f tests/db_tests_asama5.sql
+psql -d osgb -f tests/db_tests_asama6.sql
+```
+
+Arayüz testleri (Node + Playwright; gerçek Supabase'e bağlanmaz, sahte istemci kullanır):
+
+```
+node tests/ui/ui.test.mjs
+```
+
+## Gizli bilgiler
+
+`.env` dosyaları ve `*.xlsx / *.csv` dosyaları `.gitignore` ile dışarıda tutulur. `service_role` ve yapay zekâ anahtarları
+hiçbir koşulda depoya girmez.

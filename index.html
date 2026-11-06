@@ -6043,6 +6043,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
 
   function ziyaretKaydet() {
     if (!ziyaretDuzenlenebilirMi()) return Promise.reject(new Error('Bu görünüm yalnızca görüntüleme içindir.'));
+    App._zsCache = {};
     return Store.set(ziyaretYolu(App.ziyaretYil, App.ziyaretKullanici), App.ziyaret);
   }
 
@@ -6157,7 +6158,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
         '<p>' + (yon ? 'Kullanıcıyı Firmalar sayfasında bir firmaya İş Güvenliği Uzmanı veya İşyeri Hekimi olarak atayın.' : 'Bir yöneticinin sizi bir firmaya İş Güvenliği Uzmanı veya İşyeri Hekimi olarak ataması gerekiyor.') + '</p></div></div>';
     }
 
-    h += ziyaretOzetHtml(yil, ay) + ziyaretTakvimHtml(ay, yil, firmalar, duzenlenebilir);
+    h += ziyaretTakvimHtml(ay, yil, firmalar, duzenlenebilir) + ziyaretAltHtml(yil, ay, firmalar);
     return h;
   }
 
@@ -6188,6 +6189,178 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       '<div class="card"><div class="card-b" style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--ok)">' + o.gerc + '</div><div class="hint">Gerçekleşti</div></div></div>' +
       '<div class="card"><div class="card-b" style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--red)">' + o.gercDegil + '</div><div class="hint">Gerçekleşmedi · bekleyen: ' + o.bekliyor + '</div></div></div>' +
       '</div>';
+  }
+
+
+  /* ---- takvim altı: aylık firma kutuları + son ziyaret listesi ---- */
+  function ziyaretAyKayitlari(yil, ay) {
+    var onek = yil + '-' + ('0' + (ay + 1)).slice(-2) + '-', out = [];
+    Object.keys(App.ziyaret.gunler).sort().forEach(function (t) {
+      if (t.indexOf(onek) !== 0) return;
+      var gun = App.ziyaret.gunler[t];
+      ['sabah', 'ogleden_sonra', 'tam_gun'].forEach(function (z) {
+        (gun[z] || []).forEach(function (g) { out.push({ tarih: t, zaman: z, firmaId: g.firmaId, durum: g.durum || '' }); });
+      });
+    });
+    return out;
+  }
+  function ziyaretFirmaAdiById(id) {
+    var f = App.firmalar.find(function (x) { return x._id === id; });
+    return f ? firmaKisa(f) : '(silinmiş firma)';
+  }
+  function ziyaretAyGruplari(yil, ay, firmalar) {
+    var kayit = ziyaretAyKayitlari(yil, ay), benim = {};
+    firmalar.forEach(function (f) { benim[f._id] = true; });
+    var planli = {}, gerc = {}, gercDegil = {};
+    kayit.forEach(function (k) {
+      planli[k.firmaId] = true;
+      if (k.durum === 'gerçekleşti') (gerc[k.firmaId] = gerc[k.firmaId] || []).push(k);
+      else (gercDegil[k.firmaId] = gercDegil[k.firmaId] || []).push(k);
+    });
+    var yok = firmalar.filter(function (f) { return !planli[f._id]; });
+    return { kayit: kayit, yok: yok, gerc: gerc, gercDegil: gercDegil };
+  }
+  function ziyaretAltHtml(yil, ay, firmalar) {
+    var g = ziyaretAyGruplari(yil, ay, firmalar);
+    function kutu(anahtar, sayi, renk, etiket) {
+      return '<div class="card zk-kutu" role="button" tabindex="0" data-zkutu="' + anahtar + '" style="cursor:pointer"><div class="card-b" style="text-align:center">' +
+        '<div style="font-size:24px;font-weight:700' + (renk ? ';color:' + renk : '') + '">' + sayi + '</div>' +
+        '<div class="hint">' + etiket + '</div><div class="hint" style="font-size:10px;margin-top:2px">Ayrıntı için tıklayın</div></div></div>';
+    }
+    return '<div class="grid3" style="margin-top:16px;margin-bottom:16px">' +
+      kutu('yok', g.yok.length, 'var(--ink)', ayAdiBasHarf(ay) + ' planına dahil edilmemiş firma') +
+      kutu('gerc', Object.keys(g.gerc).length, 'var(--ok)', 'Ziyaret gerçekleştirilmiş firma') +
+      kutu('gercdegil', Object.keys(g.gercDegil).length, 'var(--red)', 'Ziyaret gerçekleştirilmemiş firma') +
+      '</div>' +
+      '<div class="card"><div class="card-h"><h2>Ziyaret tarihleri</h2></div><div class="card-b" id="zSon"><p class="hint">Yükleniyor…</p></div></div>';
+  }
+  function ziyaretKutuModal(anahtar) {
+    var yil = App.ziyaretYilSec, ay = App.ziyaretAy, hedef = ziyaretHedefKullanici();
+    var g = ziyaretAyGruplari(yil, ay, hedef ? kullaniciFirmalari(hedef) : []);
+    var baslik, govde;
+    var ayEtiket = ayAdiBasHarf(ay) + ' ' + yil;
+    function tablo(basliklar, satirlar, bos) {
+      if (!satirlar.length) return '<p class="hint">' + bos + '</p>';
+      return '<div class="table-wrap"><table class="tbl"><thead><tr>' + basliklar.map(function (b) { return '<th>' + b + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        satirlar.join('') + '</tbody></table></div>';
+    }
+    if (anahtar === 'yok') {
+      baslik = ayEtiket + ' — planına dahil edilmemiş firmalar (' + g.yok.length + ')';
+      govde = '<p class="hint" style="margin-top:0">Bu ay için takvime hiç ziyaret işareti girilmemiş firmalar.</p>' +
+        tablo(['Firma'], g.yok.slice().sort(function (a, b) { return firmaKisa(a).localeCompare(firmaKisa(b), 'tr'); }).map(function (f) {
+          return '<tr><td><b>' + esc(firmaKisa(f)) + '</b>' + (f.kisaAd && f.kisaAd.trim() ? '<div class="hint">' + esc(f.unvan) + '</div>' : '') + '</td></tr>';
+        }), 'Tüm firmalar bu ay takvime işlenmiş.');
+    } else if (anahtar === 'gerc') {
+      baslik = ayEtiket + ' — ziyaret gerçekleştirilen firmalar (' + Object.keys(g.gerc).length + ')';
+      govde = tablo(['Firma', 'Ziyaret tarihi'], Object.keys(g.gerc).sort(function (a, b) {
+        return ziyaretFirmaAdiById(a).localeCompare(ziyaretFirmaAdiById(b), 'tr');
+      }).map(function (id) {
+        return '<tr><td><b>' + esc(ziyaretFirmaAdiById(id)) + '</b></td><td>' + g.gerc[id].map(function (k) { return esc(trTarih(k.tarih)); }).join('<br>') + '</td></tr>';
+      }), 'Bu ay gidildi olarak işaretlenmiş ziyaret yok.');
+    } else {
+      var liste = [];
+      Object.keys(g.gercDegil).forEach(function (id) { g.gercDegil[id].forEach(function (k) { liste.push(k); }); });
+      liste.sort(function (a, b) { return a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0; });
+      baslik = ayEtiket + ' — ziyaret gerçekleştirilmemiş firmalar (' + Object.keys(g.gercDegil).length + ')';
+      govde = '<p class="hint" style="margin-top:0">Planlanmış ama “gidildi” işaretlenmemiş (gri) ya da iptal edilmiş (kırmızı) ziyaretler.</p>' +
+        tablo(['Tarih', 'Firma', 'Durum'], liste.map(function (k) {
+          var iptal = k.durum === 'gerçekleşmedi';
+          return '<tr><td>' + esc(trTarih(k.tarih)) + '</td><td><b>' + esc(ziyaretFirmaAdiById(k.firmaId)) + '</b></td><td><span style="color:' + (iptal ? 'var(--red)' : 'var(--muted)') + ';font-weight:600">' + (iptal ? 'İptal edildi' : 'Gidildi işaretlenmedi') + '</span></td></tr>';
+        }), 'Gerçekleştirilmemiş ziyaret yok.');
+    }
+    modal({ baslik: baslik, govde: govde, iptal: 'Kapat', wide: true });
+  }
+
+  function ziyaretGunFarki(iso) {
+    var b = new Date(); b.setHours(0, 0, 0, 0);
+    return Math.round((b - new Date(iso + 'T00:00:00')) / 864e5);
+  }
+  function ziyaretYilVerisi(yil, ku) {
+    if (App.ziyaretYil === yil && App.ziyaretKullanici === ku && App.ziyaret) return Promise.resolve(App.ziyaret);
+    App._zsCache = App._zsCache || {};
+    var k = ku + '/' + yil;
+    if (App._zsCache[k]) return Promise.resolve(App._zsCache[k]);
+    return Store.get(ziyaretYolu(yil, ku)).then(function (v) {
+      v = v || { yil: yil, gunler: {} }; if (!v.gunler) v.gunler = {};
+      App._zsCache[k] = v; return v;
+    });
+  }
+  /* firma → son "gerçekleşti" tarihi (bugün ve öncesi, son 4 yıl) */
+  function ziyaretSonTarihleri(ku) {
+    var yb = new Date().getFullYear(), yillar = [yb - 3, yb - 2, yb - 1, yb];
+    return Promise.all(yillar.map(function (y) { return ziyaretYilVerisi(y, ku); })).then(function (docs) {
+      var son = {};
+      docs.forEach(function (d) {
+        Object.keys(d.gunler || {}).forEach(function (t) {
+          var gun = d.gunler[t];
+          ['sabah', 'ogleden_sonra', 'tam_gun'].forEach(function (z) {
+            (gun[z] || []).forEach(function (x) {
+              if (x.durum === 'gerçekleşti' && (!son[x.firmaId] || son[x.firmaId] < t)) son[x.firmaId] = t;
+            });
+          });
+        });
+      });
+      return son;
+    });
+  }
+  function ziyaretSonDoldur() {
+    var kap = $('#zSon'); if (!kap) return;
+    var hedef = ziyaretHedefKullanici(); if (!hedef) return;
+    var firmalar = kullaniciFirmalari(hedef), duz = ziyaretDuzenlenebilirMi();
+    ziyaretSonTarihleri(hedef).then(function (son) {
+      kap = $('#zSon'); if (!kap || App.route.ad !== 'ziyaret' || ziyaretHedefKullanici() !== hedef) return;
+      if (!firmalar.length) { kap.innerHTML = '<p class="hint">Atanmış firma yok.</p>'; return; }
+      var bugunISO = isoTarih(new Date());
+      var satirlar = firmalar.map(function (f) { return { f: f, t: son[f._id] || '' }; });
+      satirlar.sort(function (a, b) {
+        if (!a.t && !b.t) return firmaKisa(a.f).localeCompare(firmaKisa(b.f), 'tr');
+        if (!a.t) return -1; if (!b.t) return 1;
+        return a.t < b.t ? -1 : a.t > b.t ? 1 : firmaKisa(a.f).localeCompare(firmaKisa(b.f), 'tr');
+      });
+      kap.innerHTML = '<p class="hint" style="margin-top:0">Ziyaretten en uzun süre geçmiş firma en üstte. ' +
+        (duz ? 'Son ziyaret tarihini değiştirebilirsiniz; takvimde o tarihte kayıt yoksa “Tüm gün” olarak gidildi işaretiyle eklenir.' : 'Salt okunur görünüm.') + '</p>' +
+        '<div class="table-wrap"><table class="tbl"><thead><tr><th>Son ziyaret tarihi</th><th>Firma</th><th>Geçen süre</th></tr></thead><tbody>' +
+        satirlar.map(function (r) {
+          var gun = r.t ? ziyaretGunFarki(r.t) : null;
+          return '<tr><td style="white-space:nowrap"><input type="date" data-zson="' + esc(r.f._id) + '" value="' + esc(r.t) + '" max="' + bugunISO + '" min="' + (new Date().getFullYear() - 3) + '-01-01"' + (duz ? '' : ' disabled') + ' style="width:auto">' +
+            (r.t ? '' : ' <span class="hint">kayıt yok</span>') + '</td>' +
+            '<td><b>' + esc(firmaKisa(r.f)) + '</b>' + (r.f.kisaAd && r.f.kisaAd.trim() ? '<div class="hint">' + esc(r.f.unvan) + '</div>' : '') + '</td>' +
+            '<td>' + (gun === null ? '—' : (gun === 0 ? 'Bugün' : gun + ' gün')) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      $$('[data-zson]', kap).forEach(function (inp) {
+        var eski = inp.value;
+        inp.addEventListener('change', function () { ziyaretSonTarihYaz(inp.getAttribute('data-zson'), inp.value, eski, son[inp.getAttribute('data-zson')] || ''); });
+      });
+    }).catch(function (e) { var k2 = $('#zSon'); if (k2) k2.innerHTML = '<p class="hint">Liste yüklenemedi: ' + esc(e && e.message || e) + '</p>'; });
+  }
+  /* elle girilen son ziyaret tarihini takvime işler (kayıt yoksa ekler, varsa gidildi yapar) */
+  function ziyaretSonTarihYaz(firmaId, iso, eski, mevcutSon) {
+    if (!ziyaretDuzenlenebilirMi()) return;
+    var ku = App.kullanici.kullanici;
+    if (!iso) { toast('Tarih boş bırakılamaz', 'err'); ziyaretSonDoldur(); return; }
+    if (iso > isoTarih(new Date())) { toast('Son ziyaret tarihi bugünden ileri olamaz', 'err'); ziyaretSonDoldur(); return; }
+    if (mevcutSon && iso < mevcutSon) {
+      toast('Takvimde bu firma için ' + trTarih(mevcutSon) + ' tarihli daha yeni bir “gidildi” kaydı var. Önce takvimden o kaydı kaldırın ya da değiştirin.', 'err');
+      ziyaretSonDoldur(); return;
+    }
+    var yil = +iso.slice(0, 4);
+    ziyaretYilVerisi(yil, ku).then(function (doc) {
+      var gun = doc.gunler[iso];
+      if (!gun) gun = doc.gunler[iso] = { sabah: [], ogleden_sonra: [], tam_gun: [] };
+      var var_ = null;
+      ['sabah', 'ogleden_sonra', 'tam_gun'].forEach(function (z) {
+        gun[z] = gun[z] || [];
+        gun[z].forEach(function (x) { if (x.firmaId === firmaId && !var_) var_ = x; });
+      });
+      if (var_) { var_.durum = 'gerçekleşti'; var_.guncelleme = new Date().toISOString(); }
+      else gun.tam_gun.push({ id: uid('zy'), firmaId: firmaId, tekrar: '', tekrarId: uid('tkr'), durum: 'gerçekleşti', olusturan: ku, guncelleme: new Date().toISOString(), elleGirildi: true });
+      var yazim = (App.ziyaretYil === yil && App.ziyaretKullanici === ku && doc === App.ziyaret) ? ziyaretKaydet() : Store.set(ziyaretYolu(yil, ku), doc);
+      return yazim.then(function () {
+        App._zsCache = {};
+        toast(var_ ? 'Son ziyaret tarihi güncellendi' : 'Son ziyaret tarihi takvime işlendi', 'ok');
+        renderZiyaret();
+      });
+    }).catch(function (e) { toast('Kaydedilemedi: ' + (e && e.message || e), 'err'); ziyaretSonDoldur(); });
   }
 
   function ziyaretTakvimHtml(ayIndex, yil, firmalarim, duzenlenebilir) {
@@ -6332,6 +6505,12 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       App.ziyaretYilSec = +$('#zYil').value; App.ziyaret = null; renderZiyaret();
     });
     var zw = $('#zWord'); if (zw) zw.addEventListener('click', ziyaretWordIndir);
+    $$('[data-zkutu]').forEach(function (k) {
+      var ac = function () { ziyaretKutuModal(k.getAttribute('data-zkutu')); };
+      k.addEventListener('click', ac);
+      k.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ac(); } });
+    });
+    ziyaretSonDoldur();
     if (!ziyaretDuzenlenebilirMi()) return; // salt okunur görünümde düzenleme olayı bağlanmaz
     $$('[data-zekle]').forEach(function (b) {
       b.addEventListener('click', function () {

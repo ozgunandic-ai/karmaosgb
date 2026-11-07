@@ -67,6 +67,8 @@ textarea{resize:vertical;min-height:70px}
 .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:var(--radius);
   border:1px solid transparent;font-weight:600;font-size:13px;white-space:nowrap;transition:background .12s,border-color .12s}
 .btn-primary{background:var(--red);color:#fff}
+.zd-btn{border:1px solid var(--line);background:var(--paper);color:var(--muted);border-radius:var(--radius);padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.zd-btn.var{background:var(--warn-bg);border-color:var(--warn);color:var(--warn);font-weight:600}
 .btn-primary:hover{background:var(--red-d)}
 .btn-dark{background:var(--ink);color:#fff}
 .btn-dark:hover{background:var(--ink-2)}
@@ -2137,7 +2139,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
   var LOG_TUR = {
     firmalar: 'Firma', planlar: 'Yıllık İSG planı', egitimplani: 'Yıllık eğitim planı', egitimoturum: 'Eğitim kaydı', egitimgecmis: 'Önceki eğitim kaydı',
     kutuphane: 'Kütüphane belgesi', evrak: 'Firma evrakı', tehlike: 'Tehlike Avcısı analizi', saglik: 'Sağlık kaydı', users: 'Kullanıcı',
-    ziyaret: 'Ziyaret takvimi', app: 'Uygulama ayarı', oturum: 'Oturum'
+    ziyaret: 'Ziyaret takvimi', ziyaretnot: 'Ziyaret detayı', app: 'Uygulama ayarı', oturum: 'Oturum'
   };
   var LOG_ATLA = /^(islemlog|_saglik)(\/|$)|_(dosya|pdf|foto)\//;   // dosya içerikleri ayrıca yazılmaz; kayıtları zaten günlüğe düşer
   var LOG = { bekleyen: [], calisiyor: false };
@@ -2152,6 +2154,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     try {
       var p = yol.split('/'), koll = p[0], id = p[1];
       if (koll === 'ziyaret') return (p[1] || '') + ' · ' + (p[2] || '');
+      if (koll === 'ziyaretnot') return p[1] || '';
       var k = veri || logKayit(koll, id); if (!k) return '';
       var bol = function (a) { return a.filter(Boolean).join(' · '); };
       if (koll === 'firmalar') return k.unvan || '';
@@ -6307,7 +6310,8 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     var kap = $('#zSon'); if (!kap) return;
     var hedef = ziyaretHedefKullanici(); if (!hedef) return;
     var firmalar = kullaniciFirmalari(hedef), duz = ziyaretDuzenlenebilirMi();
-    ziyaretSonTarihleri(hedef).then(function (son) {
+    Promise.all([ziyaretSonTarihleri(hedef), ziyaretNotlari(hedef)]).then(function (sonuc) {
+      var son = sonuc[0], notlar = sonuc[1];
       kap = $('#zSon'); if (!kap || App.route.ad !== 'ziyaret' || ziyaretHedefKullanici() !== hedef) return;
       if (!firmalar.length) { kap.innerHTML = '<p class="hint">Atanmış firma yok.</p>'; return; }
       var bugunISO = isoTarih(new Date());
@@ -6319,19 +6323,44 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       });
       kap.innerHTML = '<p class="hint" style="margin-top:0">Ziyaretten en uzun süre geçmiş firma en üstte. ' +
         (duz ? 'Son ziyaret tarihini değiştirebilirsiniz; takvimde o tarihte kayıt yoksa “Tüm gün” olarak gidildi işaretiyle eklenir.' : 'Salt okunur görünüm.') + '</p>' +
-        '<div class="table-wrap"><table class="tbl"><thead><tr><th>Son ziyaret tarihi</th><th>Firma</th><th>Geçen süre</th></tr></thead><tbody>' +
+        '<div class="table-wrap"><table class="tbl"><thead><tr><th>Son ziyaret tarihi</th><th>Firma</th><th>Geçen süre</th><th>Ziyaret detayı</th></tr></thead><tbody>' +
         satirlar.map(function (r) {
           var gun = r.t ? ziyaretGunFarki(r.t) : null;
           return '<tr><td style="white-space:nowrap"><input type="date" data-zson="' + esc(r.f._id) + '" value="' + esc(r.t) + '" max="' + bugunISO + '" min="' + (new Date().getFullYear() - 3) + '-01-01"' + (duz ? '' : ' disabled') + ' style="width:auto">' +
             (r.t ? '' : ' <span class="hint">kayıt yok</span>') + '</td>' +
             '<td><b>' + esc(firmaKisa(r.f)) + '</b>' + (r.f.kisaAd && r.f.kisaAd.trim() ? '<div class="hint">' + esc(r.f.unvan) + '</div>' : '') + '</td>' +
-            '<td>' + (gun === null ? '—' : (gun === 0 ? 'Bugün' : gun + ' gün')) + '</td></tr>';
+            '<td>' + (gun === null ? '—' : (gun === 0 ? 'Bugün' : gun + ' gün')) + '</td>' +
+            '<td>' + (notlar[r.f._id] && notlar[r.f._id].metin ? '<button class="zd-btn var" data-zdetay="' + esc(r.f._id) + '" title="' + esc(String(notlar[r.f._id].metin).slice(0, 120)) + '">📝 Detay var</button>' : '<button class="zd-btn" data-zdetay="' + esc(r.f._id) + '">Detay yaz</button>') + '</td></tr>';
         }).join('') + '</tbody></table></div>';
+      $$('[data-zdetay]', kap).forEach(function (b) {
+        b.addEventListener('click', function () { ziyaretDetayModal(b.getAttribute('data-zdetay'), hedef, notlar); });
+      });
       $$('[data-zson]', kap).forEach(function (inp) {
         var eski = inp.value;
         inp.addEventListener('change', function () { ziyaretSonTarihYaz(inp.getAttribute('data-zson'), inp.value, eski, son[inp.getAttribute('data-zson')] || ''); });
       });
     }).catch(function (e) { var k2 = $('#zSon'); if (k2) k2.innerHTML = '<p class="hint">Liste yüklenemedi: ' + esc(e && e.message || e) + '</p>'; });
+  }
+  /* ziyaret detayı (firma başına görüşme notu) — yol: ziyaretnot/<kullanici> */
+  function ziyaretNotlari(ku) {
+    return Store.get('ziyaretnot/' + ku).then(function (v) { return (v && v.notlar) || {}; });
+  }
+  function ziyaretDetayModal(firmaId, ku, notlar) {
+    var f = kullaniciFirmalari(ku).filter(function (x) { return x._id === firmaId; })[0]; if (!f) return;
+    var duz = ziyaretDuzenlenebilirMi(), n = notlar[firmaId] || {};
+    var govde = '<p class="hint" style="margin-top:0">Bu firmada yaptığınız görüşmenin detaylarını yazabilirsiniz.</p>' +
+      '<textarea id="zdMetin" rows="9" style="width:100%"' + (duz ? '' : ' readonly') + ' placeholder="Görüşülen kişi, konuşulan konular, alınan kararlar, yapılacak işler…">' + esc(n.metin || '') + '</textarea>' +
+      (n.guncelleme ? '<p class="hint">Son güncelleme: ' + esc(trTarih(String(n.guncelleme).slice(0, 10))) + '</p>' : '');
+    modal({ baslik: 'Ziyaret detayı · ' + firmaKisa(f), govde: govde, wide: true, iptal: duz ? 'Vazgeç' : 'Kapat', onay: duz ? 'Kaydet' : '',
+      kaydet: function (kapat) {
+        var metin = ($('#zdMetin').value || '').trim();
+        Store.get('ziyaretnot/' + ku).then(function (d) {
+          d = d || { notlar: {} }; d.notlar = d.notlar || {};
+          if (metin) d.notlar[firmaId] = { metin: metin, guncelleme: new Date().toISOString() }; else delete d.notlar[firmaId];
+          return Store.set('ziyaretnot/' + ku, d);
+        }).then(function () { kapat(); toast('Ziyaret detayı kaydedildi', 'ok'); ziyaretSonDoldur(); })
+          .catch(function (e) { toast('Kaydedilemedi: ' + (e && e.message || e), 'err'); });
+      } });
   }
   /* elle girilen son ziyaret tarihini takvime işler (kayıt yoksa ekler, varsa gidildi yapar) */
   function ziyaretSonTarihYaz(firmaId, iso, eski, mevcutSon) {

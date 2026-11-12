@@ -7793,14 +7793,16 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       /* sonuç */
       var ps = foWel(sgH(T[18], 1, 0), 'p'), say = s.tedavi.v === 'e', kis = s.kisit.v === 'e';
       sgMetinDegis(ps[1], /[….]{2,}/, sgBasHarf(sgTemiz(s.is))); if (s.elverisli === 'h') sgMetinDegis(ps[1], /elverişlidir\./, 'elverişli değildir.');
-      if (sgSakincali(s.gurultu)) adParaYaz(ps[3], '2. ' + SG_GURULTU_METIN); else { adSil(ps[3]); adSil(ps[2]); }
-      if (sgSakincali(s.toz)) adParaYaz(ps[5], '3. ' + SG_TOZ_METIN); else { adSil(ps[5]); adSil(ps[4]); }
+      var sn = 2; /* yazılan maddeler 1'den başlayarak ardışık numaralanır (atlanan madde numarada boşluk bırakmaz) */
+      if (sgSakincali(s.gurultu)) adParaYaz(ps[3], (sn++) + '. ' + SG_GURULTU_METIN); else { adSil(ps[3]); adSil(ps[2]); }
+      if (sgSakincali(s.toz)) adParaYaz(ps[5], (sn++) + '. ' + SG_TOZ_METIN); else { adSil(ps[5]); adSil(ps[4]); }
       if (say) {
         var tur = sgTemiz(s.tedavi.tur), pol = sgTemiz(s.tedavi.pol).toLocaleLowerCase('tr');
         sgMetinDegis(ps[7], /[….]{2,}\s*Tedavisine/, (tur ? tur + ' ' : '') + 'tedavisine');
         sgMetinDegis(ps[7], /[….]{2,}\s*poliklinik/, (pol ? pol + ' ' : '') + 'poliklinik');
+        sgMetinDegis(ps[7], /^\s*4\./, (sn++) + '.');
       } else { adSil(ps[7]); adSil(ps[6]); }
-      if (kis) sgMetinDegis(ps[9], /[….]{2,}/, sgTemiz(s.kisit.t)); else { adSil(ps[9]); adSil(ps[8]); }
+      if (kis) { sgMetinDegis(ps[9], /[….]{2,}/, sgTemiz(s.kisit.t)); sgMetinDegis(ps[9], /^\s*5\./, (sn++) + '.'); } else { adSil(ps[9]); adSil(ps[8]); }
       var t18 = T[18], p2 = foWel(sgH(t18, 2, 0), 'p')[1];
       sgEkle(sgH(t18, 2, 0), ''); foYerles(p2, foMetin(p2).length, foMetin(p2).length, ' ' + (r.hekim || ''));
       sgMetinDegis(foWel(sgH(t18, 2, 1), 'p')[3], /[….]{2,}\s*\/\s*[….]{2,}\s*\/\s*[….]{2,}/, sgSlash(r.tarih));
@@ -7828,7 +7830,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       var p2 = foWel(sgH(t6, 1, 1), 'p')[2];
       if (s.elverisli === 'h') adParaYaz(p2, '—'); else if (sart.length) sgMetinDegis(p2, /[….]{2,}/, sartMetin); else adParaYaz(p2, 'Herhangi bir şart aranmaksızın çalışmaya elverişlidir.');
       sgKutuIsaretle(foWel(sgH(t6, 2, 1), 'p')[1], r.yuksek === 'e' ? 0 : 1); sgKutuIsaretle(foWel(sgH(t6, 3, 1), 'p')[1], r.gece === 'e' ? 0 : 1);
-      var dus = []; if (sgSakincali(s.gurultu)) dus.push('2. ' + SG_GURULTU_METIN); if (sgSakincali(s.toz)) dus.push('3. ' + SG_TOZ_METIN); if (s.dusunce.trim()) dus.push(s.dusunce.trim());
+      var dus = []; if (sgSakincali(s.gurultu)) dus.push((dus.length + 1) + '. ' + SG_GURULTU_METIN); if (sgSakincali(s.toz)) dus.push((dus.length + 1) + '. ' + SG_TOZ_METIN); if (s.dusunce.trim()) dus.push(s.dusunce.trim());
       sgYaz(sgH(T[9], 0, 0), dus.join(' '));
       sgYaz(sgH(T[12], 0, 1), r.hekim || ''); sgMetinDegis(foWel(sgH(T[12], 0, 3), 'p')[0], /[….]{2,}\s*\/\s*[….]{2,}\s*\/\s*20[….]+/, sgSlash(r.tarih));
       foWel(doc, 'highlight').forEach(adSil);

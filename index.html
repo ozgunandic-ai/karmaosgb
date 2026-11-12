@@ -7462,7 +7462,7 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       c: { adSoyad: '', tc: '', sgkNo: '', dogumYeri: '', dogumTarihi: '', cinsiyet: '', egitim: '', medeni: '', cocuk: '', adres: '', tel: '', meslek: '', yapilanIs: '', bolum: '' },
       isler: [0, 1, 2].map(function () { return { kol: '', is: '', giris: '', cikis: '' }; }),
       oz: { kan: '', rh: '', kronik: ['', '', ''], tetanoz: '', hepb: '', diger: '' },
-      soy: { anne: { d: 'S', t: '' }, baba: { d: 'S', t: '' }, kardes: { d: 'S', t: '' }, cocuk: { d: 'S', t: '' } },
+      soy: { anne: { d: 'S', t: '' }, baba: { d: 'S', t: '' }, kardes: { sayi: '', sag: '', vefat: '', t: '' }, cocuk: { d: 'S', t: '' } },
       an1: SG_SOL.map(function () { return 'h'; }), an2: SG_SAG.map(function () { return 'h'; }), an1d: ['', ''],
       q: { hastane: d(), ameliyat: d(), kaza: d(), meslek: d(), malul: d(), tedavi: d(), sigara: { v: 'h', a: '', b: '', c: '', d: '', e: '' }, alkol: { v: 'h', a: '', b: '', c: '', d: '', e: '' } },
       fizik: Object.assign({}, SG_FIZIK_VARSAYILAN), lab: Object.assign({}, SG_LAB_VARSAYILAN), vit: { ta1: '', ta2: '', nb: '', boy: '', kilo: '', vki: '' }, gece: 'e', yuksek: 'e',
@@ -7567,8 +7567,11 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
     h += sgKart('4. Özgeçmiş ve soy geçmişi', '<div class="grid3">' + sgIn('oz.kan', 'Kan grubu', 'text', 'A, B, AB, 0') + '<div class="field"><label>Rh</label>' + sgRad('oz.rh', [['+', '+'], ['-', '−']]) + '</div><div></div>' +
       sgIn('oz.kronik.0', 'Konjenital / kronik hastalık 1') + sgIn('oz.kronik.1', 'Konjenital / kronik hastalık 2') + sgIn('oz.kronik.2', 'Konjenital / kronik hastalık 3') +
       sgIn('oz.tetanoz', 'Tetanoz aşısı (yıl)') + sgIn('oz.hepb', 'Hepatit B aşısı (yıl)') + sgIn('oz.diger', 'Diğer aşı (ad / yıl)') + '</div><div class="hint" style="margin:12px 0 4px">Soy geçmişi</div>' +
-      [['anne', 'Anne'], ['baba', 'Baba'], ['kardes', 'Kardeş'], ['cocuk', 'Çocuk']].map(function (x) {
-        return '<div class="grid3" style="margin-bottom:6px;align-items:end"><div class="field"><label>' + x[1] + '</label>' + sgRad('soy.' + x[0] + '.d', [['S', 'Sağ'], ['V', 'Vefat']]) + '</div>' + sgIn('soy.' + x[0] + '.t', 'Kronik hastalık (sağ) / vefat nedeni') + '<div></div></div>'; }).join(''));
+      [['anne', 'Anne'], ['baba', 'Baba']].map(function (x) {
+        return '<div class="grid3" style="margin-bottom:6px;align-items:end"><div class="field"><label>' + x[1] + '</label>' + sgRad('soy.' + x[0] + '.d', [['S', 'Sağ'], ['V', 'Vefat']]) + '</div>' + sgIn('soy.' + x[0] + '.t', 'Kronik hastalık (sağ) / vefat nedeni') + '<div></div></div>'; }).join('') +
+      '<div class="grid3" style="margin-bottom:6px;align-items:end">' + sgIn('soy.kardes.sayi', 'Kardeş sayısı', 'number') + sgIn('soy.kardes.sag', 'Sağ kardeş sayısı', 'number') + sgIn('soy.kardes.vefat', 'Vefat eden kardeş sayısı', 'number') + '</div>' +
+      '<div class="grid3" style="margin-bottom:6px;align-items:end">' + sgIn('soy.kardes.t', 'Kardeş: kronik hastalık (sağ) / vefat nedeni') + '<div></div><div></div></div>' +
+      '<div class="grid3" style="margin-bottom:6px;align-items:end"><div class="field"><label>Çocuk</label>' + sgRad('soy.cocuk.d', [['S', 'Sağ'], ['V', 'Vefat']]) + '</div>' + sgIn('soy.cocuk.t', 'Kronik hastalık (sağ) / vefat nedeni') + '<div class="hint">Çocuk sayısı, “2. Çalışan bilgileri” bölümünden Word’e yazılır.</div></div>');
     var satir = function (ad, p, i) { return '<tr><td>' + esc(ad) + '</td><td>' + sgRad(p + '.' + i, SG_HE) + '</td></tr>'; };
     h += sgKart('5. Tıbbi anamnez', '<div class="grid2"><div><div class="hint"><strong>1. Aşağıdaki yakınmalardan herhangi birini yaşadınız mı?</strong></div><table class="tbl"><tbody>' + SG_SOL.map(function (a, i) { return satir(a, 'an1', i); }).join('') + '</tbody></table></div>' +
       '<div><div class="hint"><strong>2. Aşağıdaki hastalıklardan herhangi biri için teşhis konuldu mu?</strong></div><table class="tbl"><tbody>' + SG_SAG.map(function (a, i) { return satir(a, 'an2', i); }).join('') + '</tbody></table></div></div>' +
@@ -7709,6 +7712,15 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       x.appendChild(d.importNode(new DOMParser().parseFromString(s, 'application/xml').documentElement, true));
     });
   }
+  /* "Sağ [kutu]" / "Vefat [kutu]" hücresinde, kutudan sonraki boşluk parçasının sonuna sayıyı ekler */
+  function sgKutuSayi(tc, v) {
+    if (!tc || !v) return;
+    var ts = foWel(tc, 't'), t = ts.filter(function (x) { return /^\s+$/.test(x.textContent); })[0] || ts[0]; if (!t) return;
+    var run = t.parentNode, d = run.ownerDocument, yeni = run.cloneNode(true), yt = foWel(yeni, 't')[0];
+    yt.textContent = v + ' '; yt.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
+    ['sz', 'szCs'].forEach(function (k) { var e = foCocuk(foCocuk(yeni, 'rPr'), k); if (e) e.setAttributeNS(WNS, 'w:val', '16'); });
+    run.parentNode.insertBefore(yeni, run.nextSibling);
+  }
   /* paragraftaki n. "☐" işaretini "☒" yapar */
   function sgKutuIsaretle(p, n) {
     var t = foMetin(p), i = -1, k;
@@ -7740,10 +7752,19 @@ window.BELGE_SABLON = {"parts": [{"n": "[Content_Types].xml", "t": "<?xml versio
       r.oz.kronik.forEach(function (v, i) { sgEkle(sgH(t6, i + 2, 1), v ? ' ' + v : ''); });
       sgYaz(sgH(t6, 2, 3), r.oz.tetanoz); sgYaz(sgH(t6, 3, 3), r.oz.hepb); sgYaz(sgH(t6, 4, 3), r.oz.diger);
       /* soy geçmişi */
-      ['anne', 'baba', 'kardes'].forEach(function (k, i) {
+      ['anne', 'baba'].forEach(function (k, i) {
         var x = r.soy[k];
         if (x.d === 'V') { sgTik(sgH(T[8], 3, i), 0); sgEkle(sgH(T[8], 3, i), x.t ? ' ' + x.t : ''); } else { sgTik(sgH(T[8], 2, i), 0); sgEkle(sgH(T[8], 2, i), x.t ? ' ' + x.t : ''); }
       });
+      /* kardeş: toplam sayı "Kardeş:" yanına (aynı yazı tipi/boyut); sağ / vefat sayısı girilmişse kutu işaretlenir, sayı kutunun yanına yazılır */
+      var kd = r.soy.kardes || {}, kSayi = function (v) { return String(v === undefined || v === null ? '' : v).trim(); };
+      sgEkle(sgH(T[8], 1, 2), kSayi(kd.sayi) ? ' ' + kSayi(kd.sayi) : '');
+      var kSag = kSayi(kd.sag), kVef = kSayi(kd.vefat), kSagVar = kSag !== '' && +kSag > 0, kVefVar = kVef !== '' && +kVef > 0;
+      if (kSagVar) { sgTik(sgH(T[8], 2, 2), 0); sgKutuSayi(sgH(T[8], 2, 2), kSag); }
+      if (kVefVar) { sgTik(sgH(T[8], 3, 2), 0); sgKutuSayi(sgH(T[8], 3, 2), kVef); }
+      if (kd.t) sgEkle(sgH(T[8], kVefVar && !kSagVar ? 3 : 2, 2), ' ' + kd.t);
+      /* çocuk sayısı: "Çocuk:" yanına */
+      sgEkle(sgH(T[8], 1, 3), String(c.cocuk || '').trim() ? ' ' + String(c.cocuk).trim() : '');
       sgYaz(sgH(T[8], 2, 3), sgTemiz(r.soy.cocuk.t));
       /* tıbbi anamnez */
       var t10 = T[10];

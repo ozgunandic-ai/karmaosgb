@@ -91,7 +91,7 @@ async function sabitEsit(a, b) {
 async function anahtarDenetle(request, env) {
   if (!env.BUCKET || !env.ZIYARET_ANAHTAR) return J({ hata: 'Sunucu yapılandırması eksik (BUCKET / ZIYARET_ANAHTAR).' }, 503);
   const m = /^Bearer\s+(.+)$/i.exec(request.headers.get('Authorization') || '');
-  if (!m || !(await sabitEsit(m[1].trim(), env.ZIYARET_ANAHTAR))) {
+  if (!m || !(await sabitEsit(m[1].trim(), String(env.ZIYARET_ANAHTAR).trim()))) {
     return new Response(JSON.stringify({ hata: 'Yetkisiz erişim.' }), {
       status: 401,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'www-authenticate': 'Bearer' }

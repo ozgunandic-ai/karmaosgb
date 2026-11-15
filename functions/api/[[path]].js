@@ -262,6 +262,7 @@ async function ziyaretlerYenile(request, env, url) {
   const ONEK = KOK + 'ziyaret/';
   let devam = url.searchParams.get('devam') || '';
   let son = devam, islenen = 0, bitti = true;
+  const belgeler = [];
   dis: while (true) {
     b.k--;
     const r = await env.BUCKET.list({ prefix: ONEK, startAfter: devam || undefined, limit: 100 });
@@ -280,12 +281,15 @@ async function ziyaretlerYenile(request, env, url) {
           if (s.kalan < 0) { bitti = false; break dis; }
         }
       }
+      belgeler.push(m[1] + '/' + m[2] + ': gerçekleşen=' + (doc ? Object.keys(gerceklesenler(doc)).length : 'okunamadı'));
       son = o.key; islenen++;
     }
     if (!r.truncated) break;
     devam = son;
   }
-  return J({ islenen, bitti, devam: bitti ? null : son });
+  let indeksteki = null;
+  try { indeksteki = (await env.BUCKET.list({ prefix: IDX_SIRA, limit: 1000 })).objects.length; } catch (e) { indeksteki = 'okunamadı: ' + String((e && e.message) || e).slice(0, 120); }
+  return J({ islenen, bitti, devam: bitti ? null : son, belgeler, indeksteki });
 }
 
 export async function onRequest({ request, env }) {

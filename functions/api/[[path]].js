@@ -205,6 +205,14 @@ async function ziyaretIzle(env, p, veri) {
   try { await ziyaretIndeksle(env, m[1], m[2], veri, { k: 40 }); } catch (e) { console.error('ziyaret indeks hatası', e); }
 }
 
+// beklenmeyen hata Cloudflare'in düz '1101' sayfası yerine nedenini gösteren JSON olarak dönsün
+async function guvenli(fn) {
+  try { return await fn(); } catch (e) {
+    console.error('ziyaretler hata', e);
+    return J({ hata: 'Sunucu hatası', ayrinti: String((e && e.message) || e).slice(0, 300) }, 500);
+  }
+}
+
 async function ziyaretlerGet(request, env, url) {
   const red = await anahtarDenetle(request, env);
   if (red) return red;
@@ -221,8 +229,8 @@ async function ziyaretlerGet(request, env, url) {
   limit = Math.min(limit, 500);
 
   const ufuk = new Date(Date.now() - UFUK_MS).toISOString();
-  // '\x7f': aynı damgalı anahtarlar ('damga~id') bunun öncesinde kalır -> since SONRASI (>) döner
-  const r = await env.BUCKET.list({ prefix: IDX_SIRA, startAfter: IDX_SIRA + since + '\x7f', limit, include: ['customMetadata'] });
+  // since + '~~': aynı damgalı anahtarlar ('damga~id'; id harf/rakam/_/-) bunun öncesinde kalır -> since SONRASI (>) döner
+  const r = await env.BUCKET.list({ prefix: IDX_SIRA, startAfter: IDX_SIRA + since + '~~', limit, include: ['customMetadata'] });
   const kayitlar = [];
   for (const o of r.objects) {
     const damga = o.key.slice(IDX_SIRA.length, IDX_SIRA.length + 24);
@@ -286,8 +294,8 @@ export async function onRequest({ request, env }) {
     const u0 = new URL(request.url);
     const y0 = u0.pathname.split('/').filter(Boolean);
     if (y0[0] === 'api' && y0[1] === 'ziyaretler') {
-      if (y0.length === 2) return request.method === 'GET' ? ziyaretlerGet(request, env, u0) : J({ hata: 'Yöntem desteklenmiyor' }, 405);
-      if (y0.length === 3 && y0[2] === 'yenile') return request.method === 'POST' ? ziyaretlerYenile(request, env, u0) : J({ hata: 'Yöntem desteklenmiyor' }, 405);
+      if (y0.length === 2) return request.method === 'GET' ? guvenli(() => ziyaretlerGet(request, env, u0)) : J({ hata: 'Yöntem desteklenmiyor' }, 405);
+      if (y0.length === 3 && y0[2] === 'yenile') return request.method === 'POST' ? guvenli(() => ziyaretlerYenile(request, env, u0)) : J({ hata: 'Yöntem desteklenmiyor' }, 405);
     }
   }
   if (!env.BUCKET || !env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) {
